@@ -13,7 +13,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
   await requireAdmin();
   const [badges] = await rows<{ orders: number; reviews: number; messages: number }>(sql`
     SELECT
-      (SELECT COUNT(*)::int FROM orders WHERE order_status = 'pending') AS orders,
+      (SELECT COUNT(*)::int FROM orders WHERE order_status IN ('pending', 'confirmed')) AS orders,
       (SELECT COUNT(*)::int FROM product_reviews WHERE status = 'pending') AS reviews,
       (SELECT COUNT(*)::int FROM contact_messages WHERE is_read = 0) AS messages
   `);

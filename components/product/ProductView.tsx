@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Minus, Plus, RefreshCw, Truck, X, ZoomIn } from "lucide-react";
+import { Banknote, Lock, Minus, Plus, RefreshCw, Truck, X, ZoomIn } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
 import WishlistButton from "@/components/account/WishlistButton";
@@ -23,9 +23,10 @@ type Props = {
 };
 
 const TRUST = [
-  { icon: Truck, text: "Free shipping on orders ₹499+" },
-  { icon: RefreshCw, text: "7-day easy returns" },
-  { icon: Lock, text: "Secure checkout" },
+  { icon: Truck, title: "Free shipping", text: "On ₹499 and above" },
+  { icon: RefreshCw, title: "7-day returns", text: "Easy and simple" },
+  { icon: Banknote, title: "COD available", text: "Pay on delivery" },
+  { icon: Lock, title: "Secure checkout", text: "UPI, cards and more" },
 ];
 
 export default function ProductView({ productId, name, price, comparePrice, quantity, images, colors, sizes, children }: Props) {
@@ -49,7 +50,7 @@ export default function ProductView({ productId, name, price, comparePrice, quan
     <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
       <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
         <button type="button" onClick={() => lightbox.current?.showModal()} aria-label="Zoom image" className="group relative block aspect-square w-full cursor-zoom-in overflow-hidden rounded-3xl border bg-white">
-          {current && <Image src={productImage(current.path)} alt={current.alt} fill priority sizes="(max-width: 1024px) 100vw, 50vw" className="object-contain p-4" />}
+          {current && <Image src={productImage(current.path)} alt={current.alt} fill priority sizes="(max-width: 1024px) 100vw, 50vw" className="object-contain" />}
           <span className="absolute right-3 bottom-3 grid size-9 place-items-center rounded-full border bg-background/80 text-foreground opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"><ZoomIn className="size-4" aria-hidden="true" /></span>
         </button>
         {shown.length > 1 && (
@@ -72,15 +73,20 @@ export default function ProductView({ productId, name, price, comparePrice, quan
 
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{name}</h1>
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-b pb-6">
-          <span className="text-3xl font-semibold">{formatPrice(priceNum)}</span>
-          {discount > 0 && (
-            <>
-              <span className="text-lg text-muted-foreground line-through">{formatPrice(compare)}</span>
-              <Badge variant="destructive">-{discount}%</Badge>
-            </>
-          )}
-          {!inStock && <Badge variant="outline">Out of stock</Badge>}
+        <div className="mt-4 border-b pb-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-3xl font-semibold">{formatPrice(priceNum)}</span>
+            {discount > 0 && (
+              <>
+                <span className="text-lg text-muted-foreground line-through">{formatPrice(compare)}</span>
+                <Badge variant="destructive">{discount}% off</Badge>
+              </>
+            )}
+          </div>
+          {discount > 0 && <p className="mt-1 text-sm font-medium text-success">You save {formatPrice(compare - priceNum)}</p>}
+          <p className={cn("mt-3 text-sm font-medium", !inStock || quantity <= 5 ? "text-destructive" : "text-success")} role="status">
+            {!inStock ? "Out of stock" : quantity <= 5 ? `Hurry, only ${quantity} left` : "In stock, ready to ship"}
+          </p>
         </div>
 
         {colors.length > 0 && (
@@ -139,13 +145,24 @@ export default function ProductView({ productId, name, price, comparePrice, quan
           <WishlistButton productId={productId} color={color} size={size} labelled />
         </div>
 
-        <ul className="mt-6 grid gap-2 rounded-2xl border bg-muted/40 p-4 text-sm dark:bg-muted/20">
-          {TRUST.map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-center gap-2 text-muted-foreground"><Icon className="size-4 shrink-0" aria-hidden="true" /> {text}</li>
+        <ul className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border">
+          {TRUST.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-center gap-2.5 bg-card p-3">
+              <Icon className="size-5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0"><span className="block text-xs font-medium">{title}</span><span className="block text-xs text-muted-foreground">{text}</span></span>
+            </li>
           ))}
         </ul>
 
         {children}
+      </div>
+
+      <div data-sticky-buy className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="shrink-0">
+          <p className="font-semibold">{formatPrice(priceNum)}</p>
+          {discount > 0 && <p className="text-xs text-success">{discount}% off</p>}
+        </div>
+        <AddToCartButton productId={productId} inStock={inStock} quantity={count} color={color} size={size} />
       </div>
 
       <dialog ref={lightbox} onClick={(e) => e.target === lightbox.current && lightbox.current?.close()} className="m-auto max-h-[92vh] w-[92vw] max-w-4xl rounded-2xl bg-white p-0 backdrop:bg-black/80">

@@ -10,7 +10,7 @@ import { clearAbandoned } from "./actions";
 export const metadata = { title: "Orders" };
 
 const BASE = "/admin/orders";
-const STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
+const STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 
 type Props = { searchParams: Promise<{ q?: string; status?: string; page?: string }> };
 

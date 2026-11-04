@@ -60,4 +60,4 @@ export function Pill({ tone, children }: { tone: keyof typeof SEVERITY_CLS; chil
 }
 
 /** Colour for an order or payment status. */
-export const statusTone = (s: string): keyof typeof SEVERITY_CLS => (s === "delivered" || s === "paid" ? "ok" : s === "cancelled" || s === "failed" ? "error" : s === "shipped" || s === "processing" ? "notice" : s === "refunded" ? "muted" : "warning");
+export const statusTone = (s: string): keyof typeof SEVERITY_CLS => (s === "delivered" || s === "paid" ? "ok" : s === "cancelled" || s === "failed" ? "error" : s === "shipped" || s === "processing" || s === "confirmed" ? "notice" : s === "refunded" ? "muted" : "warning");

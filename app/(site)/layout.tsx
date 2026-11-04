@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Analytics from "@/components/layout/Analytics";
 import Footer from "@/components/layout/Footer";
 import Header from "@/components/layout/Header";
-import SeoTagCloud from "@/components/layout/SeoTagCloud";
 import { ScrollProgress } from "@/components/velora/scroll-progress";
 import { getSuggestedSearches } from "@/lib/catalog";
 import { getNavigation } from "@/lib/navigation";
@@ -28,7 +27,6 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <ScrollProgress className="z-60" />
       <Header navigation={navigation} suggestedSearches={suggested.map((s) => s.term)} />
       <main id="main-content" className="overflow-x-clip">{children}</main>
-      <SeoTagCloud />
       <Footer />
       <Analytics />
     </>

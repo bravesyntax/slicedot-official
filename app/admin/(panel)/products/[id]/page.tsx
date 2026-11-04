@@ -142,11 +142,11 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
               </div>
               <Field name="vendor" label="Brand" value={p?.vendor} />
               <Field name="product_type" label="Type" value={p?.product_type} />
-              <Field name="product_tags" label="Tags" value={p?.product_tags} hint="Comma separated. Shown on the product page." />
+              <Field name="product_tags" label="Tags" value={p?.product_tags} hint="Comma separated. Customers can find this product by these words." />
               <div>
                 <label htmlFor="keywords" className={labelCls}>Related keywords</label>
                 <textarea id="keywords" name="keywords" rows={3} defaultValue={tags.map((t) => t.tag_name).join(", ")} className={`${inputCls} resize-y`} />
-                <p className="mt-1 text-[11px] text-muted-foreground">Comma separated, up to 30. Linked to searches from the product page.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Comma separated, up to 30. Customers find this product when they search these words.</p>
               </div>
               {collections.length > 0 && (
                 <fieldset>

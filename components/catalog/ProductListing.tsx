@@ -35,15 +35,15 @@ export default async function ProductListing({ searchParams, basePath, title, de
   const filterProps = { categories, colors, activeCategory: category?.slug };
 
   return (
-    <div className={cn(container, "py-8 sm:py-12")}>
+    <div className={cn(container, "py-6 sm:py-8")}>
       <Crumbs items={crumbs} />
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{filters.search ? `Results for "${filters.search}"` : title}</h1>
-      {description && !filters.search && <p className="mt-2 max-w-2xl text-muted-foreground">{description}</p>}
+      <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">{filters.search ? `Results for "${filters.search}"` : title}</h1>
+      {description && !filters.search && <p className="mt-1 line-clamp-2 max-w-2xl text-sm text-muted-foreground">{description}</p>}
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[15rem_1fr]">
+      <div className="mt-6 grid gap-8 lg:grid-cols-[14rem_1fr]">
         <SidebarFilters {...filterProps} />
         <div className="min-w-0">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="sticky top-16 z-30 -mx-5 mb-4 flex flex-wrap items-center justify-between gap-3 border-b bg-background/90 px-5 py-2 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:px-3 lg:static lg:bg-transparent lg:backdrop-blur-none">
             <p className="text-sm text-muted-foreground" role="status">{total} {total === 1 ? "product" : "products"}</p>
             <div className="flex items-center gap-2">
               <MobileFilters {...filterProps} />
@@ -52,9 +52,9 @@ export default async function ProductListing({ searchParams, basePath, title, de
           </div>
 
           {items.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 2xl:grid-cols-4">
               {items.map((product) => (
-                <ProductCard key={product.id} product={product} sizes="(max-width: 1280px) 50vw, 25vw" />
+                <ProductCard key={product.id} product={product} sizes="(max-width: 640px) 50vw, 25vw" />
               ))}
             </div>
           ) : (

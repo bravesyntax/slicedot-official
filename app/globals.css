@@ -280,3 +280,10 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* The product page's fixed Add to Bag bar must not cover the end of the page on phones. */
+@media (width < 64rem) {
+  body:has([data-sticky-buy]) {
+    padding-bottom: 4.5rem;
+  }
+}

@@ -1,38 +1,31 @@
-import SeoSchema from "@/components/SeoSchema";
-import { pageMetadata } from "@/lib/seo";
-import { ArrowRight, BadgeCheck, Check, Gift, Headset, Layers, Package, RefreshCw, ShieldCheck, Truck, Zap } from "lucide-react";
+import { ArrowRight, BadgePercent, Banknote, RefreshCw, ShieldCheck, Sparkles, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import ProductCard from "@/components/home/ProductCard";
 import Slider from "@/components/home/Slider";
-import { CtaLink, IconChip, PageHero, Section, SectionHeading, ShimmerLink, container } from "@/components/site/ui";
+import SeoSchema from "@/components/SeoSchema";
+import { container } from "@/components/site/ui";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { BlurFade } from "@/components/velora/blur-fade";
-import { BorderBeam } from "@/components/velora/border-beam";
-import { Marquee } from "@/components/velora/marquee";
-import { SpotlightCard } from "@/components/velora/spotlight-card";
-import { getCategoryProducts, getFeaturedProducts, getHomeFaqs, getLatestProducts, getRootCategories, getTrendingProducts } from "@/lib/catalog";
+import { getCategoryProducts, getCategoryTree, getDealProducts, getFeaturedProducts, getHomeFaqs, getLatestProducts, getRootCategories, getTrendingProducts, type ProductCard as Product } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/config";
-import { categoryImage, categoryUrl } from "@/lib/routes";
+import { categoryImage, categoryUrl, productImage } from "@/lib/routes";
+import { pageMetadata } from "@/lib/seo";
 import { getSeoSettings, getStoreSettings } from "@/lib/settings";
 
 export const revalidate = 300;
 
-// Root categories that get their own product slider, in this order.
-const SLIDER_CATEGORIES = ["Jewelry", "Kitchen & Home", "Perfumes", "Phone Accessories"];
-
 const TRUST = [
-  { icon: Truck, title: "Free Shipping", text: "Orders ₹499+" },
-  { icon: RefreshCw, title: "Easy Returns", text: "7-day policy" },
-  { icon: ShieldCheck, title: "Secure Pay", text: "100% safe" },
-  { icon: Headset, title: "24/7 Support", text: "Always here" },
+  { icon: Truck, title: "Free shipping", text: "On orders of ₹499 and above" },
+  { icon: RefreshCw, title: "Easy returns", text: "Within 7 days of delivery" },
+  { icon: Banknote, title: "Cash on Delivery", text: "Pay when it arrives" },
+  { icon: ShieldCheck, title: "Secure payments", text: "UPI, cards and net banking" },
 ];
-const DIFFERENCE = [
-  { icon: Check, title: "Quality", text: "Premium items" },
-  { icon: Zap, title: "Fast Ship", text: "Quick delivery" },
-  { icon: ShieldCheck, title: "Secure", text: "Safe payments" },
-  { icon: RefreshCw, title: "Returns", text: "7-day policy" },
+const BUDGETS = [
+  { label: "Under ₹500", href: "/products?price=0-500", tint: "bg-rose-50 dark:bg-rose-950/40" },
+  { label: "₹500 to ₹1,000", href: "/products?price=500-1000", tint: "bg-amber-50 dark:bg-amber-950/40" },
+  { label: "₹1,000 to ₹2,000", href: "/products?price=1000-2000", tint: "bg-sky-50 dark:bg-sky-950/40" },
 ];
 const FALLBACK_FAQS = [
   { question: "What types of products are available at SliceDot?", answer: "SliceDot offers hair accessories, phone essentials, kitchen gadgets, jewelry, perfumes, home decor, and lifestyle products at affordable prices." },
@@ -45,20 +38,42 @@ const FALLBACK_FAQS = [
 
 export const generateMetadata = () => pageMetadata("home");
 
-function ViewAll({ href, label = "View all" }: { href: string; label?: string }) {
+function Shelf({ title, subtitle, href, children, muted }: { title: string; subtitle?: string; href?: string; children: React.ReactNode; muted?: boolean }) {
   return (
-    <Link href={href} className="group inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-      {label}
-      <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-    </Link>
+    <section aria-label={title} className={muted ? "bg-muted/40 py-10 sm:py-14 dark:bg-muted/20" : "py-10 sm:py-14"}>
+      <div className={container}>
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
+            {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+          </div>
+          {href && (
+            <Link href={href} className="group inline-flex shrink-0 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline">
+              View all <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
+        {children}
+      </div>
+    </section>
   );
 }
 
+const ProductGrid = ({ products, badge }: { products: Product[]; badge?: "discount" | "trending" | "new" }) => (
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+    {products.map((product, i) => (
+      <BlurFade key={product.id} delay={i * 0.03} className="h-full"><ProductCard product={product} badge={badge} showSold={badge === "trending"} /></BlurFade>
+    ))}
+  </div>
+);
+
 export default async function HomePage() {
-  const [store, seo, categories, featured, trending, latest, dbFaqs] = await Promise.all([
+  const [store, seo, categories, tree, deals, featured, trending, latest, dbFaqs] = await Promise.all([
     getStoreSettings(),
     getSeoSettings(),
     getRootCategories(),
+    getCategoryTree(),
+    getDealProducts(),
     getFeaturedProducts(),
     getTrendingProducts(),
     getLatestProducts(),
@@ -66,236 +81,157 @@ export default async function HomePage() {
   ]);
   // seo_faq can hold the same question for both page = 'homepage' and page = 'all'.
   const faqs = dbFaqs.length ? dbFaqs.filter((faq, i) => dbFaqs.findIndex((f) => f.question === faq.question) === i) : FALLBACK_FAQS;
-  const sliders = await Promise.all(
-    SLIDER_CATEGORIES.map(async (name) => {
-      const category = categories.find((c) => c.name === name);
-      return category ? { category, products: await getCategoryProducts(category.id) } : null;
-    }),
+  const rail = tree.filter((c) => c.product_count > 0).slice(0, 10);
+  const showcases = await Promise.all(
+    categories.filter((c) => c.product_count >= 2).map(async (category) => ({ category, products: await getCategoryProducts(category.id, 4) })),
   );
-  const popular = categories.filter((c) => c.product_count > 0).sort((a, b) => b.product_count - a.product_count);
+  const heroProducts = (featured.length >= 3 ? featured : latest).filter((p) => p.image).slice(0, 3);
+  const biggestDeal = deals.reduce((best, p) => Math.max(best, Math.round((1 - Number(p.price) / Number(p.compare_price)) * 100)), 0);
+  const bestsellers = trending.filter((p) => (p.total_sold ?? 0) > 0);
 
   return (
     <>
-      <PageHero
-        eyebrow="New collection available"
-        title="Everything you need, all in one place"
-        center={false}
-        actions={
-          <>
-            <ShimmerLink href="/products">Explore Collection <ArrowRight className="size-4" aria-hidden="true" /></ShimmerLink>
-            <CtaLink href="/products?sort=newest" variant="outline" arrow={false}>New Arrivals</CtaLink>
-          </>
-        }
-        aside={
-          <div className="relative overflow-hidden rounded-3xl border bg-black shadow-xl">
-            {/* eslint-disable-next-line @next/next/no-img-element -- animated GIF: the image optimizer would flatten it */}
-            <img src="/assets/hero.gif" alt={`${store.name} new collection`} className="aspect-[4/3] w-full object-cover" />
-            <BorderBeam />
-          </div>
-        }
-      >
-        Trending products for home, beauty, and lifestyle, all at amazing prices.
-      </PageHero>
-
-      <section className="border-y bg-muted/40 py-6 dark:bg-muted/20">
-        <div className={container}>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {TRUST.map(({ icon: Icon, title, text }) => (
-              <div key={title} className="flex items-center gap-3">
-                <IconChip><Icon className="size-4" aria-hidden="true" /></IconChip>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{text}</p>
-                </div>
+      <section className={`${container} pt-4 sm:pt-6`} aria-label="Highlights">
+        <div className="grid gap-3 sm:gap-4 lg:grid-cols-3 lg:grid-rows-2">
+          <div className="relative isolate flex flex-col justify-between gap-8 overflow-hidden rounded-3xl bg-neutral-950 p-6 text-white sm:flex-row sm:items-center sm:gap-6 sm:p-10 lg:col-span-2 lg:row-span-2">
+            <div aria-hidden="true" className="absolute -top-24 -right-24 -z-10 size-96 rounded-full bg-white/10 blur-3xl" />
+            <div className="max-w-md min-w-0 sm:flex-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium"><Sparkles className="size-3.5" aria-hidden="true" /> New styles every week</span>
+              <h1 className="mt-5 text-4xl leading-[1.05] font-semibold tracking-tight text-balance xl:text-5xl">Everything you need, all in one place</h1>
+              <p className="mt-4 text-pretty text-white/70">Jewellery, beauty, home and phone essentials at prices that make sense, delivered across India.</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/products" className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-6 text-sm font-medium text-neutral-950 transition-opacity hover:opacity-90">Shop now <ArrowRight className="size-4" aria-hidden="true" /></Link>
+                <Link href="/products?sort=discount&discount=10" className="inline-flex h-11 items-center rounded-full border border-white/30 px-6 text-sm font-medium transition-colors hover:bg-white/10">See deals</Link>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <Section label="Shop by category">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <SectionHeading eyebrow="Explore" title="Shop by Category" />
-          <ViewAll href="/categories" />
-        </div>
-        <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
-          {categories.slice(0, 8).map((category, index) => (
-            <BlurFade key={category.id} delay={index * 0.05} className={index === 0 ? "sm:col-span-2 sm:row-span-2" : ""}>
-              <Link href={categoryUrl(category.slug)} className="group relative block h-full min-h-44 overflow-hidden rounded-2xl border bg-muted">
-                {category.image && (
-                  <Image src={categoryImage(category.image)} alt={category.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
-                )}
-                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-4">
-                  <span className="mb-1 inline-flex items-center gap-1 text-xs text-white/80">
-                    <Package className="size-3" aria-hidden="true" /> {category.product_count} items
-                  </span>
-                  <h3 className="leading-tight font-semibold text-white underline-offset-4 group-hover:underline">{category.name}</h3>
-                </div>
-              </Link>
-            </BlurFade>
-          ))}
-        </div>
-      </Section>
-
-      {sliders.map((slider) =>
-        slider && slider.products.length > 0 ? (
-          <Section key={slider.category.id} muted label={slider.category.name}>
-            <div className="flex items-end justify-between gap-4">
-              <SectionHeading eyebrow="Explore our collection" title={slider.category.name} />
-              <ViewAll href={categoryUrl(slider.category.slug)} />
             </div>
-            <div className="mt-10">
-              <Slider arrows={slider.products.length > 4}>
-                {slider.products.map((product) => (
-                  <ProductCard key={product.id} product={product} sizes="280px" />
-                ))}
-              </Slider>
-            </div>
-          </Section>
-        ) : null,
-      )}
-
-      {featured.length > 0 && (
-        <Section label="Featured products">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <SectionHeading eyebrow="Handpicked" title="Featured Products" />
-            <ViewAll href="/products?featured=1" />
-          </div>
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-            {featured.map((product, i) => (
-              <BlurFade key={product.id} delay={i * 0.04} className="h-full"><ProductCard product={product} /></BlurFade>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      <section className={`${container} pb-14 sm:pb-24`} aria-label="Free shipping offer">
-        <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-12 text-primary-foreground sm:px-12 lg:px-16">
-          <BorderBeam />
-          <div className="grid items-center gap-8 lg:grid-cols-2">
-            <div className="text-center lg:text-left">
-              <span className="inline-flex items-center gap-2 text-sm opacity-80"><Gift className="size-4" aria-hidden="true" /> Limited Offer</span>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Free shipping on ₹499+</h2>
-              <p className="mt-3 opacity-80">Shop now and enjoy free delivery plus easy 7-day returns.</p>
-              <Link href="/products" className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-background px-6 text-sm font-medium text-foreground transition-opacity hover:opacity-90">
-                Shop Now <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[["24/7", "Support"], ["100%", "Secure"], ["7", "Day Returns"]].map(([value, label]) => (
-                <div key={label} className="rounded-2xl border border-current/15 p-4 text-center">
-                  <div className="text-2xl font-semibold sm:text-3xl">{value}</div>
-                  <div className="mt-1 text-xs opacity-70">{label}</div>
+            <div className="flex shrink-0 gap-3 sm:grid sm:grid-cols-2" aria-hidden="true">
+              {heroProducts.map((product, i) => (
+                <div key={product.id} className={`relative aspect-square flex-1 overflow-hidden rounded-2xl bg-white shadow-2xl sm:w-32 xl:w-36 ${i === 1 ? "sm:translate-y-8" : ""} ${i === 2 ? "sm:col-span-2 sm:mx-auto sm:mt-4 sm:w-28" : ""}`}>
+                  <Image src={productImage(product.image!)} alt="" fill priority sizes="144px" className="object-cover" />
                 </div>
               ))}
             </div>
           </div>
+          {[
+            { title: "Top deals", text: biggestDeal ? `Up to ${biggestDeal}% off` : "Great prices", href: "/products?sort=discount&discount=10", product: deals[0], tint: "bg-rose-100 dark:bg-rose-950/50" },
+            { title: "New arrivals", text: "Fresh this week", href: "/products?sort=newest", product: latest.find((p) => p.image && !heroProducts.some((h) => h.id === p.id) && p.id !== deals[0]?.id) ?? latest[0], tint: "bg-sky-100 dark:bg-sky-950/50" },
+          ].map((tile) => (
+            <Link key={tile.title} href={tile.href} className={`group relative flex min-h-40 items-center justify-between gap-3 overflow-hidden rounded-3xl p-6 ${tile.tint}`}>
+              <span>
+                <span className="block text-sm text-muted-foreground">{tile.text}</span>
+                <span className="mt-1 block text-2xl font-semibold tracking-tight">{tile.title}</span>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium underline-offset-4 group-hover:underline">Shop now <ArrowRight className="size-4" aria-hidden="true" /></span>
+              </span>
+              {tile.product?.image && (
+                <span className="relative size-28 shrink-0 overflow-hidden rounded-2xl bg-white shadow-lg transition-transform duration-500 group-hover:scale-105 sm:size-32">
+                  <Image src={productImage(tile.product.image)} alt="" fill sizes="128px" className="object-cover" />
+                </span>
+              )}
+            </Link>
+          ))}
         </div>
       </section>
 
-      {trending.length > 0 && (
-        <Section muted label="Trending products">
-          <SectionHeading center eyebrow="Hot now" title="Trending Products" />
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {trending.map((product, i) => (
-              <BlurFade key={product.id} delay={i * 0.04} className="h-full">
-                <ProductCard product={product} badge="trending" showCategory={false} showCompare={false} showSold />
-              </BlurFade>
-            ))}
-          </div>
-          <div className="mt-8 text-center">
-            <CtaLink href="/products?sort=popular" variant="outline">View All Trending</CtaLink>
-          </div>
-        </Section>
-      )}
-
-      {latest.length > 0 && (
-        <Section label="New arrivals">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <SectionHeading eyebrow="Just arrived" title="New Arrivals">Discover our latest collection. Fresh styles added weekly.</SectionHeading>
-              <div className="mt-6"><CtaLink href="/products?sort=newest">Shop New Arrivals</CtaLink></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {latest.map((product) => (
-                <ProductCard key={product.id} product={product} badge="new" maxColors={3} showCategory={false} showCompare={false} showRating={false} />
-              ))}
-            </div>
-          </div>
-        </Section>
-      )}
-
-      <Section muted label={`The ${store.name} difference`}>
-        <SectionHeading center eyebrow="Why shop with us" title={`The ${store.name} Difference`} />
-        <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {DIFFERENCE.map(({ icon: Icon, title, text }) => (
-            <SpotlightCard key={title} className="rounded-2xl border bg-card p-5 text-card-foreground">
-              <IconChip><Icon className="size-4" aria-hidden="true" /></IconChip>
-              <h3 className="mt-4 font-medium">{title}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-            </SpotlightCard>
-          ))}
-        </div>
-      </Section>
-
-      {popular.length > 0 && (
-        <section aria-label="Browse categories" className="border-b py-6">
-          <Marquee pauseOnHover>
-            {popular.map((category) => (
-              <Link key={category.id} href={categoryUrl(category.slug)} className="mx-1 rounded-full border bg-card px-4 py-2 text-sm whitespace-nowrap transition-colors hover:border-primary hover:text-primary">
-                {category.name} <span className="text-xs text-muted-foreground tabular-nums">{category.product_count}</span>
-              </Link>
-            ))}
-          </Marquee>
+      {rail.length > 0 && (
+        <section className={`${container} pt-8 sm:pt-10`} aria-label="Shop by category">
+          <ul className="scrollbar-hide -mx-5 flex gap-4 overflow-x-auto px-5 sm:mx-0 sm:px-0 lg:justify-between">
+            {rail.map((category) => {
+              const image = category.image ? categoryImage(category.image) : category.sample_image ? productImage(category.sample_image) : null;
+              return (
+                <li key={category.id} className="w-20 shrink-0 sm:w-24">
+                  <Link href={categoryUrl(category.slug)} className="group block text-center">
+                    <span className="relative mx-auto block size-20 overflow-hidden rounded-full border bg-muted transition-shadow group-hover:ring-2 group-hover:ring-primary group-hover:ring-offset-2 group-hover:ring-offset-background sm:size-24">
+                      {image && <Image src={image} alt="" fill sizes="96px" className="object-cover" />}
+                    </span>
+                    <span className="mt-2 line-clamp-2 block text-xs leading-tight font-medium">{category.name}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 
-      <Section label={`Online shopping at ${store.name}`}>
-        <SectionHeading title={`Online Shopping at ${store.name}`} />
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
-          <SpotlightCard className="rounded-2xl border bg-card p-6 text-card-foreground">
-            <IconChip><BadgeCheck className="size-4" aria-hidden="true" /></IconChip>
-            <h3 className="mt-4 font-medium">Why Choose Us?</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Welcome to {store.name}, India&apos;s destination for quality products at affordable prices.</p>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              {["Free shipping on ₹499+", "7-day easy returns", "100% authentic products", "COD available"].map((benefit) => (
-                <li key={benefit} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" /> {benefit}</li>
-              ))}
-            </ul>
-          </SpotlightCard>
-          <SpotlightCard className="rounded-2xl border bg-card p-6 text-card-foreground">
-            <IconChip><Layers className="size-4" aria-hidden="true" /></IconChip>
-            <h3 className="mt-4 font-medium">Product Range</h3>
-            <div className="mt-2 space-y-2 text-sm text-muted-foreground">
-              <p><strong className="font-medium text-foreground">Hair &amp; Beauty:</strong> Haircare, makeup accessories, clips, scrunchies</p>
-              <p><strong className="font-medium text-foreground">Jewelry:</strong> Necklaces, earrings, bracelets, rings</p>
-              <p><strong className="font-medium text-foreground">Kitchen &amp; Home:</strong> Gadgets, storage, decor items</p>
-              <p><strong className="font-medium text-foreground">Phone Accessories:</strong> Cases, protectors, chargers</p>
-              <p><strong className="font-medium text-foreground">Perfumes:</strong> Floral, oud, fruity &amp; woody fragrances</p>
-            </div>
-          </SpotlightCard>
-          <SpotlightCard className="rounded-2xl border bg-card p-6 text-card-foreground">
-            <IconChip><Truck className="size-4" aria-hidden="true" /></IconChip>
-            <h3 className="mt-4 font-medium">Fast Delivery Across India</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              We deliver across India. Secure payments via Cards, UPI, Net Banking, and COD. Shop worry-free with SSL encryption.
-            </p>
-          </SpotlightCard>
-        </div>
-      </Section>
-
-      <Section muted label="Frequently asked questions">
-        <SectionHeading center title="Frequently Asked Questions" />
-        <Accordion type="single" collapsible className="mx-auto mt-8 max-w-3xl">
-          {faqs.map((faq) => (
-            <AccordionItem key={faq.question} value={faq.question}>
-              <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
-            </AccordionItem>
+      <section className={`${container} pt-8 sm:pt-10`} aria-label="Why shop with us">
+        <ul className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border lg:grid-cols-4">
+          {TRUST.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-center gap-3 bg-card p-4">
+              <Icon className="size-5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0"><span className="block text-sm font-medium">{title}</span><span className="block text-xs text-muted-foreground">{text}</span></span>
+            </li>
           ))}
-        </Accordion>
-      </Section>
+        </ul>
+      </section>
+
+      {deals.length > 0 && (
+        <Shelf title="Top deals" subtitle={biggestDeal ? `Save up to ${biggestDeal}% on these picks` : undefined} href="/products?sort=discount&discount=10">
+          <ProductGrid products={deals} />
+        </Shelf>
+      )}
+
+      <section className={`${container} pb-2`} aria-label="Shop by budget">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BadgePercent className="size-5" aria-hidden="true" /> Shop by budget</h2>
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
+          {BUDGETS.map((b) => (
+            <Link key={b.label} href={b.href} className={`group flex items-center justify-between rounded-2xl p-5 text-lg font-semibold tracking-tight transition-shadow hover:shadow-md ${b.tint}`}>
+              {b.label} <ArrowRight className="size-5 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {latest.length > 0 && (
+        <Shelf title="New arrivals" subtitle="The latest additions to the store" href="/products?sort=newest">
+          <Slider arrows={latest.length > 4}>
+            {latest.map((product) => <ProductCard key={product.id} product={product} badge="new" sizes="(max-width: 640px) 50vw, 25vw" />)}
+          </Slider>
+        </Shelf>
+      )}
+
+      {bestsellers.length > 0 && (
+        <Shelf muted title="Bestsellers" subtitle="What customers are buying" href="/products?sort=popularity">
+          <ProductGrid products={bestsellers} badge="trending" />
+        </Shelf>
+      )}
+
+      {showcases.map(({ category, products }) => (
+        <section key={category.id} aria-label={category.name} className="py-8 sm:py-10">
+          <div className={`${container} grid gap-3 sm:gap-4 lg:grid-cols-[17rem_1fr]`}>
+            <Link href={categoryUrl(category.slug)} className="group relative isolate flex min-h-44 flex-col justify-end overflow-hidden rounded-2xl bg-neutral-900 p-5 text-white">
+              {category.image && <Image src={categoryImage(category.image)} alt="" fill sizes="(max-width: 1024px) 100vw, 272px" className="-z-10 object-cover opacity-80 transition-transform duration-700 group-hover:scale-105" />}
+              <span aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
+              <h2 className="text-2xl font-semibold tracking-tight">{category.name}</h2>
+              <span className="mt-1 inline-flex items-center gap-1 text-sm text-white/80">{category.product_count} products <ArrowRight className="size-4" aria-hidden="true" /></span>
+            </Link>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {products.map((product) => <ProductCard key={product.id} product={product} showCategory={false} sizes="(max-width: 640px) 50vw, 20vw" />)}
+            </div>
+          </div>
+        </section>
+      ))}
+
+      {featured.length > 0 && (
+        <Shelf muted title="Handpicked for you" href="/products?featured=1">
+          <ProductGrid products={featured} />
+        </Shelf>
+      )}
+
+      <section aria-label="Frequently asked questions" className="py-10 sm:py-14">
+        <div className={`${container} grid gap-6 lg:grid-cols-[1fr_2fr] lg:gap-12`}>
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Questions? Answered.</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Still need help? <Link href="/contact" className="font-medium text-foreground underline underline-offset-4">Contact us</Link></p>
+          </div>
+          <Accordion type="single" collapsible>
+            {faqs.map((faq) => (
+              <AccordionItem key={faq.question} value={faq.question}>
+                <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+      </section>
 
       <JsonLd
         data={{

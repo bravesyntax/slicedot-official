@@ -102,11 +102,26 @@ export const getCategoryBySlug = cache(async (slug: string) => {
   return category ?? null;
 });
 
-export const getCategoryProducts = (categoryId: number) =>
+/** Newest products of a category and everything below it. */
+export const getCategoryProducts = (categoryId: number, limit = 8) =>
   rows<ProductCard>(sql`
     SELECT ${cardColumns} FROM products p LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.category_id = ${categoryId} AND p.status = 'active'
-    ORDER BY p.created_at DESC LIMIT 8
+    WHERE p.status = 'active' AND p.category_id IN (
+      WITH RECURSIVE tree AS (
+        SELECT c1.id FROM categories c1 WHERE c1.id = ${categoryId}
+        UNION ALL
+        SELECT c2.id FROM categories c2 JOIN tree ON c2.parent_id = tree.id WHERE c2.status = 'active'
+      ) SELECT id FROM tree
+    )
+    ORDER BY p.created_at DESC LIMIT ${limit}
+  `);
+
+/** Biggest real discounts that can be bought right now. */
+export const getDealProducts = () =>
+  rows<ProductCard>(sql`
+    SELECT ${cardColumns} FROM products p LEFT JOIN categories c ON p.category_id = c.id
+    WHERE p.status = 'active' AND p.compare_price > p.price AND p.quantity > 0
+    ORDER BY 1 - p.price / p.compare_price DESC, p.created_at DESC LIMIT 8
   `);
 
 export const getFeaturedProducts = () =>
@@ -128,7 +143,7 @@ export const getLatestProducts = () =>
   rows<ProductCard>(sql`
     SELECT ${cardColumns} FROM products p LEFT JOIN categories c ON p.category_id = c.id
     WHERE p.status = 'active'
-    ORDER BY p.created_at DESC LIMIT 4
+    ORDER BY p.created_at DESC LIMIT 8
   `);
 
 export const getHomeFaqs = () =>
@@ -163,7 +178,7 @@ export async function listProducts(f: ListingFilters & { categoryId?: number }, 
         SELECT c2.id FROM categories c2 JOIN tree ON c2.parent_id = tree.id WHERE c2.status = 'active'
       ) SELECT id FROM tree
     )` : sql``}
-    ${f.search ? sql`AND (p.name ILIKE ${like(f.search)} OR p.description ILIKE ${like(f.search)} OR p.short_description ILIKE ${like(f.search)} OR p.sku ILIKE ${like(f.search)})` : sql``}
+    ${f.search ? sql`AND (p.name ILIKE ${like(f.search)} OR p.description ILIKE ${like(f.search)} OR p.short_description ILIKE ${like(f.search)} OR p.sku ILIKE ${like(f.search)} OR p.product_tags ILIKE ${like(f.search)} OR EXISTS (SELECT 1 FROM product_seo_tags pst JOIN seo_tags st ON st.id = pst.tag_id WHERE pst.product_id = p.id AND st.tag_name ILIKE ${like(f.search)}))` : sql``}
     ${ranges.length ? sql`AND (${anyOf(ranges.map((r) => sql`(p.price >= ${r.min} AND p.price <= ${r.max})`))})` : sql``}
     ${f.color.length ? sql`AND (${anyOf(f.color.map((name) => sql`(p.colors_json ILIKE ${like(name)} OR p.color ILIKE ${like(name)})`))})` : sql``}
     ${f.rating ? sql`AND COALESCE(${realRating}, 0) >= ${f.rating}` : sql``}
@@ -230,13 +245,6 @@ export const getProductImages = (productId: number) =>
     SELECT image_path, alt_text, color_name FROM product_images WHERE product_id = ${productId} ORDER BY is_main DESC, sort_order ASC, id ASC
   `);
 
-export const getProductSeoTags = (productId: number) =>
-  rows<{ id: number; tag_name: string }>(sql`
-    SELECT st.id, st.tag_name FROM product_seo_tags pst JOIN seo_tags st ON pst.tag_id = st.id
-    WHERE pst.product_id = ${productId} AND st.status = 'active'
-    ORDER BY st.relevance_score DESC, st.display_priority DESC LIMIT 20
-  `);
-
 export const getProductCollections = (productId: number) =>
   rows<{ collection_name: string; collection_slug: string }>(sql`
     SELECT pc.collection_name, pc.collection_slug FROM product_collection_map m JOIN product_collections pc ON m.collection_id = pc.id
@@ -257,30 +265,18 @@ export const getWishlistProducts = (customerId: number) =>
     ORDER BY w.created_at DESC
   `);
 
-export type TagGroup = { slug: string; name: string; tags: { id: number; tag_name: string }[] };
 
-/** The site-wide popular searches: the top 300 tags, in the order of their groups. */
-export const getTagCloud = cache(async (): Promise<TagGroup[]> => {
-  const [tags, groups] = await Promise.all([
-    rows<{ id: number; tag_name: string; category_group: string }>(sql`
-      SELECT id, tag_name, category_group FROM seo_tags WHERE status = 'active' AND is_global = 1
-      ORDER BY is_featured DESC, display_priority DESC, relevance_score DESC, id LIMIT 300
-    `),
-    rows<{ group_slug: string; group_name: string }>(sql`SELECT group_slug, group_name FROM seo_tag_groups WHERE status = 'active' ORDER BY sort_order, id`),
-  ]);
-  return groups
-    .map((g) => ({ slug: g.group_slug, name: g.group_name, tags: tags.filter((t) => t.category_group === g.group_slug).map(({ id, tag_name }) => ({ id, tag_name })) }))
-    .filter((g) => g.tags.length > 0);
-});
-
+/** Popular searches for the search box: trending terms first, then the keywords in Admin → SEO. */
 export const getSuggestedSearches = () =>
   rows<{ term: string }>(sql`
-    SELECT COALESCE(NULLIF(display_text, ''), search_term) AS term FROM seo_trending_searches
-    WHERE status = 'active' ORDER BY is_featured DESC, sort_order ASC, search_count DESC LIMIT 6
+    SELECT term FROM (
+      SELECT DISTINCT ON (lower(term)) term, rank, pos FROM (
+        SELECT COALESCE(NULLIF(display_text, ''), search_term) AS term, 0 AS rank, ROW_NUMBER() OVER (ORDER BY is_featured DESC, sort_order ASC, search_count DESC) AS pos FROM seo_trending_searches WHERE status = 'active'
+        UNION ALL
+        SELECT tag_name, 1, ROW_NUMBER() OVER (ORDER BY is_featured DESC, display_priority DESC, id) FROM seo_tags WHERE status = 'active' AND is_global = 1
+      ) both_lists ORDER BY lower(term), rank, pos
+    ) terms ORDER BY rank, pos LIMIT 12
   `);
-
-export const getTrendingSearches = () =>
-  rows<{ search_term: string }>(sql`SELECT search_term FROM trending_searches ORDER BY search_count DESC LIMIT 10`);
 
 export const getActiveProductSlugs = () => rows<{ slug: string }>(sql`SELECT slug FROM products WHERE status = 'active'`);
 

@@ -2,7 +2,6 @@ import { Mail, Phone, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { Badge } from "@/components/ui/badge";
-import { TextHoverEffect } from "@/components/velora/text-hover-effect";
 import { getRootCategories } from "@/lib/catalog";
 import { categoryUrl } from "@/lib/routes";
 import { getStoreSettings } from "@/lib/settings";
@@ -98,10 +97,8 @@ export default async function Footer() {
           </div>
         </div>
 
-        <TextHoverEffect text="SLICEDOT" className="mt-8 hidden w-full sm:block" />
-
         <div className="mt-6 flex flex-col items-center justify-between gap-4 border-t pt-6 text-xs text-muted-foreground sm:flex-row">
-          <p>&copy; {new Date().getFullYear()} {store.name}. All rights reserved. Made with ♥ in India.</p>
+          <p>&copy; {new Date().getFullYear()} {store.name}. All rights reserved. Designed and built by <a href="https://bravesyntax.com" target="_blank" rel="noopener" className="font-medium text-foreground underline-offset-4 hover:underline">BraveSyntax</a></p>
           <nav className="flex items-center gap-4" aria-label="Legal links">
             <Link href="/terms" className="transition-colors hover:text-foreground">Terms</Link>
             <Link href="/privacy-policy" className="transition-colors hover:text-foreground">Privacy</Link>

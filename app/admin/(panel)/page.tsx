@@ -18,7 +18,7 @@ export default async function DashboardPage() {
         (SELECT COALESCE(SUM(total), 0) FROM orders WHERE order_status NOT IN ('cancelled', ${AWAITING_PAYMENT})) AS revenue,
         (SELECT COUNT(*)::int FROM orders WHERE order_status <> ${AWAITING_PAYMENT}) AS orders,
         (SELECT COUNT(*)::int FROM orders WHERE order_status <> ${AWAITING_PAYMENT} AND created_at >= date_trunc('day', LOCALTIMESTAMP)) AS today,
-        (SELECT COUNT(*)::int FROM orders WHERE order_status = 'pending') AS pending,
+        (SELECT COUNT(*)::int FROM orders WHERE order_status IN ('pending', 'confirmed')) AS pending,
         (SELECT COUNT(*)::int FROM products WHERE status = 'active') AS products,
         (SELECT COUNT(*)::int FROM customers) AS customers,
         (SELECT COUNT(*)::int FROM product_reviews WHERE status = 'pending') AS reviews,
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   ]);
   const score = healthScore(targets);
   const todo: [number, string, string][] = [
-    [stats.pending, "orders waiting to be processed", "/admin/orders?status=pending"],
+    [stats.pending, "orders waiting to be processed", "/admin/orders"],
     [stats.reviews, "reviews waiting for approval", "/admin/reviews"],
     [stats.messages, "unread messages", "/admin/messages?filter=unread"],
   ];

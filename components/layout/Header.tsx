@@ -91,56 +91,21 @@ export default function Header({ navigation, suggestedSearches }: { navigation: 
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
+    <>
+    <p className="bg-neutral-950 px-4 py-2 text-center text-xs font-medium text-white">Free shipping on orders of ₹499+ <span className="hidden sm:inline"><span aria-hidden="true" className="mx-1.5 opacity-50">·</span> Cash on Delivery available <span aria-hidden="true" className="mx-1.5 opacity-50">·</span> Easy 7-day returns</span></p>
+    <header className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-md">
       <nav aria-label="Main" className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-5 sm:px-6 lg:px-8">
         <Link href="/" aria-label="SliceDot home" className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Logo className="h-9" priority />
         </Link>
 
-        <ul className="ml-4 hidden items-center gap-0.5 xl:flex">
-          {navigation.map((item) => {
-            const sections = withLinks(item);
-            return (
-              <li key={item.id}>
-                {sections.length > 0 ? (
-                  <DropdownMenu modal={false}>
-                    <DropdownMenuTrigger asChild>
-                      <button type="button" className={`group/menu inline-flex items-center gap-1 whitespace-nowrap capitalize data-[state=open]:bg-muted data-[state=open]:text-foreground ${linkClass}`}>
-                        {item.title.toLowerCase()}
-                        <ChevronDown aria-hidden="true" className="size-3.5 transition-transform duration-200 group-data-[state=open]/menu:rotate-180 motion-reduce:transition-none" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" sideOffset={14} className="w-[34rem] max-w-(--radix-dropdown-menu-content-available-width) rounded-2xl p-2 shadow-xl shadow-foreground/5">
-                      <div className="grid grid-cols-2 gap-2">
-                        {sections.map((section) => (
-                          <div key={section.id}>
-                            <DropdownMenuLabel className="px-2.5 pt-2 pb-1 capitalize">{section.title.toLowerCase()}</DropdownMenuLabel>
-                            {section.items.map((link) => (
-                              <DropdownMenuItem key={link.id} asChild className="rounded-lg px-2.5 py-2">
-                                <Link href={link.url ?? "/products"}>{link.title}</Link>
-                              </DropdownMenuItem>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <Link href={item.url ?? "/products"} className={`block whitespace-nowrap capitalize ${linkClass}`}>
-                    {item.title.toLowerCase()}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
 
-        <div className="ml-auto flex items-center gap-1">
           <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon-lg" aria-label="Search products">
-                <Search aria-hidden="true" />
-              </Button>
+              <button type="button" aria-label="Search products" className="ml-auto grid size-10 shrink-0 place-items-center rounded-lg text-foreground transition-colors hover:bg-muted md:mx-auto md:flex md:h-10 md:w-full md:max-w-xl md:flex-1 md:items-center md:justify-start md:gap-2 md:rounded-full md:border md:bg-muted/50 md:px-4 md:text-sm md:text-muted-foreground">
+                <Search aria-hidden="true" className="size-5 md:size-4" />
+                <span className="hidden md:inline">Search for products and categories</span>
+              </button>
             </SheetTrigger>
             <SheetContent
               side="top"
@@ -183,7 +148,7 @@ export default function Header({ navigation, suggestedSearches }: { navigation: 
                   </div>
                 ) : (
                   <>
-                    <p className="mt-5 text-sm font-medium text-muted-foreground">Suggested searches</p>
+                    <p className="mt-5 text-sm font-medium text-muted-foreground">Popular searches</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {suggestedSearches.map((term) => (
                         <button key={term} type="button" onClick={() => search(term)} className="rounded-full border bg-card px-4 py-2 text-sm transition-colors hover:border-primary hover:text-primary">
@@ -196,6 +161,7 @@ export default function Header({ navigation, suggestedSearches }: { navigation: 
               </div>
             </SheetContent>
           </Sheet>
+        <div className="flex items-center gap-1">
           <ThemeToggler isDark={isDark} onToggle={toggleTheme} className="hidden sm:grid" />
           {customer ? (
             <DropdownMenu modal={false}>
@@ -232,7 +198,7 @@ export default function Header({ navigation, suggestedSearches }: { navigation: 
 
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon-lg" aria-label="Open menu" className="xl:hidden">
+              <Button variant="ghost" size="icon-lg" aria-label="Open menu" className="lg:hidden">
                 <Menu aria-hidden="true" />
               </Button>
             </SheetTrigger>
@@ -300,6 +266,49 @@ export default function Header({ navigation, suggestedSearches }: { navigation: 
           </Sheet>
         </div>
       </nav>
+      <div className="hidden border-t lg:block">
+        <ul className="mx-auto flex h-11 max-w-7xl items-center gap-0.5 px-5 sm:px-6 lg:px-8">
+          <li><Link href="/products" className={`block whitespace-nowrap font-medium text-foreground ${linkClass}`}>All Products</Link></li>
+          {navigation.map((item) => {
+            const sections = withLinks(item);
+            return (
+              <li key={item.id}>
+                {sections.length > 0 ? (
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className={`group/menu inline-flex items-center gap-1 whitespace-nowrap capitalize data-[state=open]:bg-muted data-[state=open]:text-foreground ${linkClass}`}>
+                        {item.title.toLowerCase()}
+                        <ChevronDown aria-hidden="true" className="size-3.5 transition-transform duration-200 group-data-[state=open]/menu:rotate-180 motion-reduce:transition-none" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" sideOffset={14} className="w-[34rem] max-w-(--radix-dropdown-menu-content-available-width) rounded-2xl p-2 shadow-xl shadow-foreground/5">
+                      <div className="grid grid-cols-2 gap-2">
+                        {sections.map((section) => (
+                          <div key={section.id}>
+                            <DropdownMenuLabel className="px-2.5 pt-2 pb-1 capitalize">{section.title.toLowerCase()}</DropdownMenuLabel>
+                            {section.items.map((link) => (
+                              <DropdownMenuItem key={link.id} asChild className="rounded-lg px-2.5 py-2">
+                                <Link href={link.url ?? "/products"}>{link.title}</Link>
+                              </DropdownMenuItem>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Link href={item.url ?? "/products"} className={`block whitespace-nowrap capitalize ${linkClass}`}>
+                    {item.title.toLowerCase()}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+          <li className="ml-auto"><Link href="/products?sort=newest" className={`block whitespace-nowrap ${linkClass}`}>New Arrivals</Link></li>
+          <li><Link href="/products?sort=discount&discount=10" className={`block whitespace-nowrap font-medium text-destructive ${linkClass}`}>Deals</Link></li>
+        </ul>
+      </div>
     </header>
+    </>
   );
 }

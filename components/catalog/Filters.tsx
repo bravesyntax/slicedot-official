@@ -124,7 +124,7 @@ function FilterPanel({ categories, colors, activeCategory, idPrefix }: FilterPro
 }
 
 export function SidebarFilters(props: FilterProps) {
-  return <aside className="hidden lg:block" aria-label="Filters"><FilterPanel {...props} idPrefix="side" /></aside>;
+  return <aside className="scrollbar-hide hidden lg:sticky lg:top-32 lg:block lg:max-h-[calc(100svh-9rem)] lg:overflow-y-auto" aria-label="Filters"><FilterPanel {...props} idPrefix="side" /></aside>;
 }
 
 export function MobileFilters(props: FilterProps) {

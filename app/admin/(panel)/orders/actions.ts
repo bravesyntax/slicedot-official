@@ -9,11 +9,12 @@ import { AWAITING_PAYMENT } from "@/lib/orders";
 import { SITE_URL } from "@/lib/config";
 import { field } from "@/lib/validation";
 
-const STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
+const STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 const PAYMENTS = ["pending", "paid", "failed", "refunded"];
 const REFUNDS = ["", "processing", "completed", "failed"];
 
 const STATUS_LINE: Record<string, string> = {
+  confirmed: "is confirmed",
   processing: "is being prepared",
   shipped: "has been shipped and is on its way",
   delivered: "has been delivered. We hope you love it",

@@ -13,7 +13,7 @@ export const container = "mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8";
 
 export function Section({ children, className, muted, id, label }: { children: ReactNode; className?: string; muted?: boolean; id?: string; label?: string }) {
   return (
-    <section id={id} aria-label={label} className={cn("relative py-14 sm:py-24 lg:py-28", muted && "bg-muted/40 dark:bg-muted/20", className)}>
+    <section id={id} aria-label={label} className={cn("relative py-10 sm:py-16", muted && "bg-muted/40 dark:bg-muted/20", className)}>
       <div className={container}>{children}</div>
     </section>
   );
@@ -55,14 +55,14 @@ export function PageHero({
           <DotPattern aria-hidden className="absolute inset-0 -z-10 size-full fill-foreground/10 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
         </>
       )}
-      <div className={cn(container, "relative py-14 sm:py-24 lg:py-28", aside && "grid items-center gap-12 lg:grid-cols-2")}>
+      <div className={cn(container, "relative py-10 sm:py-16", aside && "grid items-center gap-12 lg:grid-cols-2")}>
         <div className={cn(center && !aside && "mx-auto max-w-3xl text-center", !center && !aside && "max-w-3xl")}>
           {eyebrow && (
             <BlurFade>
               <span className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-sm text-muted-foreground backdrop-blur">{eyebrow}</span>
             </BlurFade>
           )}
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">{title}</h1>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-5xl">{title}</h1>
           {children && <div className={cn("mt-6 text-lg text-pretty text-muted-foreground", center && !aside && "mx-auto max-w-2xl")}>{children}</div>}
           {actions && (
             <BlurFade delay={0.2}>

@@ -96,7 +96,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div>
                 <label htmlFor="order_status" className={labelCls}>Order status</label>
                 <select id="order_status" name="order_status" defaultValue={order.order_status} disabled={cancelled} className={inputCls}>
-                  {["pending", "processing", "shipped", "delivered", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
+                  {["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
                 {cancelled && <input type="hidden" name="order_status" value="cancelled" />}
               </div>

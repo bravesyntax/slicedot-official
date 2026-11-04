@@ -8,7 +8,7 @@ import ProductView from "@/components/product/ProductView";
 import ReviewSection from "@/components/product/ReviewSection";
 import { Section, SectionHeading, container } from "@/components/site/ui";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { getActiveProductSlugs, getProductBySlug, getProductCollections, getProductImages, getProductReviews, getProductSeoTags, getRelatedProducts, getTrendingSearches, productColors } from "@/lib/catalog";
+import { getActiveProductSlugs, getProductBySlug, getProductCollections, getProductImages, getProductReviews, getRelatedProducts, productColors } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/config";
 import { buildMetadata, productSeoDefaults } from "@/lib/seo";
 import SeoSchema from "@/components/SeoSchema";
@@ -41,19 +41,15 @@ const TagLinks = ({ title, links }: { title: string; links: [string, string][] }
   </div>
 );
 
-const search = (term: string) => `/products?search=${encodeURIComponent(term)}`;
-
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [gallery, seoTags, collections, related, trending, reviews, reviewSettings] = await Promise.all([
+  const [gallery, collections, related, reviews, reviewSettings] = await Promise.all([
     getProductImages(product.id),
-    getProductSeoTags(product.id),
     getProductCollections(product.id),
     getRelatedProducts(product.id, product.category_id),
-    getTrendingSearches(),
     getProductReviews(product.id),
     getReviewSettings(),
   ]);
@@ -62,22 +58,19 @@ export default async function ProductPage({ params }: Props) {
     ...(product.image ? [{ path: product.image, alt: product.name, color: null }] : []),
     ...gallery.filter((g) => g.image_path !== product.image).map((g) => ({ path: g.image_path, alt: g.alt_text || product.name, color: g.color_name || null })),
   ];
-  const tags = (product.product_tags ?? "").split(",").map((t) => t.trim()).filter(Boolean);
   const sizes = (product.size ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const specs: [string, string | null][] = [["SKU", product.sku], ["Material", product.material], ["Weight", product.weight], ["Dimensions", product.dimensions], ["Barcode", product.barcode]];
   const average = reviews.length ? reviews.reduce((n, r) => n + r.rating, 0) / reviews.length : 0;
 
   return (
     <>
-      <div className={`${container} py-6 sm:py-10`}>
-        <div className="mb-6">
+      <div className={`${container} py-5 sm:py-8`}>
+        <div className="mb-5">
           <Crumbs items={[["Home", "/"], ["Products", "/products"], ...(product.category_name && product.category_slug ? [[product.category_name, categoryUrl(product.category_slug)] as [string, string]] : []), [product.name]]} />
         </div>
         <ProductView productId={product.id} name={product.name} price={product.price} comparePrice={product.compare_price} quantity={product.quantity} images={images} colors={productColors(product)} sizes={sizes}>
           {product.short_description && <p className="mt-6 text-muted-foreground">{product.short_description}</p>}
-          {tags.length > 0 && <TagLinks title="Tags" links={tags.map((t) => [t, `/products?tag=${encodeURIComponent(t)}`])} />}
           {collections.length > 0 && <TagLinks title="Collections" links={collections.map((c) => [c.collection_name, `/products?collection=${encodeURIComponent(c.collection_slug)}`])} />}
-          {seoTags.length > 0 && <TagLinks title="Related Keywords" links={seoTags.map((t) => [t.tag_name, search(t.tag_name)])} />}
           <Accordion type="single" collapsible defaultValue="description" className="mt-6">
             <AccordionItem value="description">
               <AccordionTrigger>Description</AccordionTrigger>
@@ -130,17 +123,6 @@ export default async function ProductPage({ params }: Props) {
             {related.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </Section>
-      )}
-
-      {trending.length > 0 && (
-        <section className={`${container} pb-14`} aria-label="Trending searches">
-          <p className="text-sm font-medium text-muted-foreground">Trending searches</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {trending.map((t) => (
-              <Link key={t.search_term} href={search(t.search_term)} className="rounded-full border bg-card px-3 py-1.5 text-xs transition-colors hover:border-primary hover:text-primary">{t.search_term}</Link>
-            ))}
-          </div>
-        </section>
       )}
 
       <JsonLd
