@@ -5,7 +5,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 let transporter: Transporter | null = null;
 
 /** Where store alerts go, such as new contact form messages. */
-export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "bravesyntax@gmail.com";
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "info@slicedot.in";
 
 export const mailConfigured = () => !!(process.env.SMTP_HOST && process.env.SMTP_USERNAME && process.env.SMTP_PASSWORD);
 
