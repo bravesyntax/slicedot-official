@@ -44,12 +44,24 @@ export const getReviewSettings = cache(async () => {
 });
 
 // Named keys only: contact_email in this table is the admin's private address, not for public pages.
-const SEO_KEYS = ["site_meta_title", "site_meta_description", "site_keywords", "google_search_console", "bing_webmaster", "google_analytics_id", "google_tag_manager_id", "business_address", "business_city", "business_state", "business_postal", "business_country"];
+const SEO_KEYS = ["seo_title_suffix", "default_og_image", "organization_name", "organization_type", "organization_logo", "site_meta_title", "site_meta_description", "site_keywords", "google_search_console", "bing_webmaster", "google_analytics_id", "google_tag_manager_id", "business_address", "business_city", "business_state", "business_postal", "business_country"];
+
+export const DEFAULT_TITLE_SUFFIX = " | SliceDot";
+const DEFAULT_SHARE_IMAGE = "/assets/logo-black.png";
+
+export type SeoSettings = Awaited<ReturnType<typeof getSeoSettings>>;
 
 export const getSeoSettings = cache(async () => {
   const data = await rows<{ setting_key: string; setting_value: string | null }>(sql`SELECT setting_key, setting_value FROM seo_settings WHERE setting_key IN ${sql(SEO_KEYS)}`);
   const get = (key: string) => data.find((r) => r.setting_key === key)?.setting_value?.trim() || "";
+  const suffix = data.find((r) => r.setting_key === "seo_title_suffix")?.setting_value;
   return {
+    titleSuffix: suffix ?? DEFAULT_TITLE_SUFFIX,
+    defaultDescription: get("site_meta_description") || "Shop quality products at SliceDot, with free shipping above ₹499, easy returns and Cash on Delivery across India.",
+    defaultImage: get("default_og_image") || DEFAULT_SHARE_IMAGE,
+    orgName: get("organization_name") || "SliceDot",
+    orgType: get("organization_type") || "OnlineStore",
+    orgLogo: get("organization_logo"),
     title: get("site_meta_title"),
     description: get("site_meta_description"),
     keywords: get("site_keywords"),

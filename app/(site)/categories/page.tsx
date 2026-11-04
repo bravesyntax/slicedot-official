@@ -1,5 +1,6 @@
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import { Package } from "lucide-react";
-import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { PageHero, container } from "@/components/site/ui";
@@ -7,11 +8,7 @@ import { BlurFade } from "@/components/velora/blur-fade";
 import { getCategoryTree } from "@/lib/catalog";
 import { categoryImage, categoryUrl, productImage } from "@/lib/routes";
 
-export const metadata: Metadata = {
-  title: "Shop by Category",
-  description: "Browse all product categories at SliceDot. Find exactly what you're looking for.",
-  alternates: { canonical: "/categories" },
-};
+export const generateMetadata = () => pageMetadata("categories");
 
 export default async function CategoriesPage() {
   const categories = await getCategoryTree();
@@ -39,6 +36,7 @@ export default async function CategoriesPage() {
           })}
         </div>
       </section>
+      <SeoSchema type="page" entityKey="categories" />
     </>
   );
 }

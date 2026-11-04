@@ -1,19 +1,17 @@
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import { Mail, MapPin, Phone } from "lucide-react";
-import type { Metadata } from "next";
 import ContactForm from "@/components/contact/ContactForm";
 import { IconChip, PageHero, RelatedLinks, container } from "@/components/site/ui";
 import { BlurFade } from "@/components/velora/blur-fade";
 import { getStoreSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: "Contact Us",
-  description: "Get in touch with SliceDot. We're here to help with any questions or concerns.",
-  alternates: { canonical: "/contact" },
-};
+export const generateMetadata = () => pageMetadata("contact");
 
 export default async function ContactPage() {
   const store = await getStoreSettings();
   return (
+    <>
     <>
       <PageHero eyebrow="Get In Touch" title="Contact Us">
         Have a question or need assistance? We&apos;re here to help. Reach out to us anytime.
@@ -70,6 +68,8 @@ export default async function ContactPage() {
           ["Privacy Policy", "/privacy-policy"],
         ]}
       />
+    </>
+      <SeoSchema type="page" entityKey="contact" />
     </>
   );
 }

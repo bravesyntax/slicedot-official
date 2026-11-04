@@ -11,6 +11,7 @@ export function toRoute(url: string | null): string | null {
 
 export const categoryUrl = (slug: string) => `/category/${slug}`;
 export const productUrl = (slug: string) => `/product/${slug}`;
-export const productImage = (file: string) => `/uploads/products/${file}`;
-export const categoryImage = (file: string) => `/uploads/categories/${file}`;
+const isFullUrl = (file: string) => /^https?:\/\//i.test(file);
+export const productImage = (file: string) => (isFullUrl(file) ? file : `/uploads/products/${file}`);
+export const categoryImage = (file: string) => (isFullUrl(file) ? file : `/uploads/categories/${file}`);
 export const formatPrice = (value: string | number) => `₹${Math.round(Number(value)).toLocaleString("en-US")}`;

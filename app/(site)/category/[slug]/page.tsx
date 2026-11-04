@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import SeoSchema from "@/components/SeoSchema";
+import { buildMetadata, categorySeoDefaults } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import ProductListing from "@/components/catalog/ProductListing";
 import { getCategoryBySlug, getCategoryTree } from "@/lib/catalog";
@@ -11,12 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
   if (!category) return {};
-  return {
-    title: category.meta_title || category.name,
-    description: category.meta_description || category.description || `Shop ${category.name} at SliceDot.`,
-    keywords: category.keywords || undefined,
-    alternates: { canonical: categoryUrl(category.slug) },
-  };
+  return buildMetadata("category", String(category.id), categorySeoDefaults(category));
 }
 
 export default async function CategoryPage({ params, searchParams }: Props) {
@@ -32,6 +29,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   }
 
   return (
+    <>
     <ProductListing
       searchParams={await searchParams}
       basePath={categoryUrl(category.slug)}
@@ -40,5 +38,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       category={category}
       crumbs={[["Home", "/"], ["Products", "/products"], ...trail, [category.name]]}
     />
+    <SeoSchema type="category" entityKey={String(category.id)} />
+    </>
   );
 }

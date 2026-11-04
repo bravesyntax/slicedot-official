@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import LegalPage from "@/components/layout/LegalPage";
 import { getStoreSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description: "How SliceDot collects, uses, and protects your personal information.",
-  alternates: { canonical: "/privacy-policy" },
-};
+export const generateMetadata = () => pageMetadata("privacy-policy");
 
 const CONTENTS: [string, string][] = [
   ["intro", "Introduction"], ["collect", "Information We Collect"], ["use", "How We Use It"], ["share", "Information Sharing"], ["security", "Data Security"], ["cookies", "Cookies"],
@@ -21,6 +18,7 @@ const Terms = ({ items }: { items: [string, string][] }) => (
 export default async function PrivacyPage() {
   const { name, email, phone } = await getStoreSettings();
   return (
+    <>
     <LegalPage title="Privacy Policy" lead="We are committed to protecting your personal information and your right to privacy." contents={CONTENTS}>
       <p><strong>Our commitment:</strong> We value your trust and will never sell your personal data to third parties. Your privacy is fundamental to how we operate.</p>
 
@@ -67,5 +65,7 @@ export default async function PrivacyPage() {
       <h2 id="contact-us">Contact Us</h2>
       <p>If you have any questions about this Privacy Policy, please contact us at <a href={`mailto:${email}`}>{email}</a>{phone && <> or <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`}>{phone}</a></>}.</p>
     </LegalPage>
+      <SeoSchema type="page" entityKey="privacy-policy" />
+    </>
   );
 }

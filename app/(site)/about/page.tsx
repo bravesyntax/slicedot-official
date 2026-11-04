@@ -1,15 +1,12 @@
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import { Check, Lightbulb, ShieldCheck, Users } from "lucide-react";
-import type { Metadata } from "next";
 import { CtaLink, IconChip, PageHero, Section, SectionHeading } from "@/components/site/ui";
 import { BlurFade } from "@/components/velora/blur-fade";
 import { SpotlightCard } from "@/components/velora/spotlight-card";
 import { getStoreSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: "About Us",
-  description: "Learn more about SliceDot, our story, mission, and commitment to quality.",
-  alternates: { canonical: "/about" },
-};
+export const generateMetadata = () => pageMetadata("about");
 
 const VALUES = [
   { icon: ShieldCheck, title: "Quality First", text: "We never compromise on quality. Every product goes through rigorous quality checks before reaching you." },
@@ -20,6 +17,7 @@ const VALUES = [
 export default async function AboutPage() {
   const store = await getStoreSettings();
   return (
+    <>
     <>
       <PageHero eyebrow="Our Story" title={`About ${store.name}`}>
         We&apos;re passionate about bringing you the best products at unbeatable prices. Our journey started with a simple idea: make quality accessible to everyone.
@@ -64,6 +62,8 @@ export default async function AboutPage() {
           <CtaLink href="/contact" variant="outline" arrow={false}>Contact Us</CtaLink>
         </div>
       </Section>
+    </>
+      <SeoSchema type="page" entityKey="about" />
     </>
   );
 }

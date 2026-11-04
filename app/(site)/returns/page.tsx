@@ -1,15 +1,12 @@
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import { Check, X } from "lucide-react";
-import type { Metadata } from "next";
 import { CtaLink, PageHero, Section, SectionHeading, container } from "@/components/site/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SpotlightCard } from "@/components/velora/spotlight-card";
 import { getStoreSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: "Returns & Refund Policy",
-  description: "Learn about our hassle-free returns and refund policy at SliceDot.",
-  alternates: { canonical: "/returns" },
-};
+export const generateMetadata = () => pageMetadata("returns");
 
 const HIGHLIGHTS = [["7 Days", "Return Window"], ["Free", "Return Pickup"], ["5–7 Days", "Refund Time"], ["100%", "Money Back"]];
 const STEPS = [
@@ -30,6 +27,7 @@ const REFUNDS = [
 export default async function ReturnsPage() {
   const store = await getStoreSettings();
   return (
+    <>
     <>
       <PageHero eyebrow="Returns & Refunds" title="Returns & Refunds">
         Easy returns, quick refunds. Your satisfaction is our priority.
@@ -113,6 +111,8 @@ export default async function ReturnsPage() {
           </div>
         </div>
       </Section>
+    </>
+      <SeoSchema type="page" entityKey="returns" />
     </>
   );
 }

@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import FaqBrowser, { type FaqGroup } from "@/components/faq/FaqBrowser";
 import JsonLd from "@/components/JsonLd";
 import { CtaLink, PageHero, container } from "@/components/site/ui";
 
-export const metadata: Metadata = {
-  title: "Frequently Asked Questions",
-  description: "Find answers to commonly asked questions about SliceDot.",
-  alternates: { canonical: "/faq" },
-};
+export const generateMetadata = () => pageMetadata("faq");
 
 const GROUPS: FaqGroup[] = [
   {
@@ -60,6 +57,7 @@ const GROUPS: FaqGroup[] = [
 export default function FaqPage() {
   return (
     <>
+    <>
       <PageHero eyebrow="Help Center" title="Frequently Asked Questions">
         Find answers to common questions about orders, shipping, returns, and more.
       </PageHero>
@@ -78,6 +76,8 @@ export default function FaqPage() {
           mainEntity: GROUPS.flatMap((g) => g.items).map(([name, text]) => ({ "@type": "Question", name, acceptedAnswer: { "@type": "Answer", text } })),
         }}
       />
+    </>
+      <SeoSchema type="page" entityKey="faq" />
     </>
   );
 }

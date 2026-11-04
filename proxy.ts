@@ -66,15 +66,16 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const gate = maintenanceGate(request);
     if (gate) return gate;
   }
-  if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
+  if (/^\/(api|admin)(\/|$)/.test(request.nextUrl.pathname)) return NextResponse.next();
 
   const hit = matchRedirect(await loadRules(), request.nextUrl.pathname);
   if (!hit) return NextResponse.next();
   event.waitUntil(
-    Promise.resolve(db()`UPDATE seo_redirects SET hits = COALESCE(hits, 0) + 1 WHERE id = ${hit.rule.id}`)
+    Promise.resolve(db()`UPDATE seo_redirects SET hits = COALESCE(hits, 0) + 1, last_hit_at = LOCALTIMESTAMP WHERE id = ${hit.rule.id}`)
       .then(() => undefined)
       .catch((err) => console.error("[proxy] redirect hit", err)),
   );
+  if (hit.status === 410) return new NextResponse("This page has been removed.", { status: 410, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   return NextResponse.redirect(new URL(hit.location, request.url), hit.status);
 }
 

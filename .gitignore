@@ -55,3 +55,6 @@ next-env.d.ts
 # Added by next dev
 /AGENTS.md
 /CLAUDE.md
+
+# Keywords removed from seo_tags, kept in case any are wanted back
+/db/seo-tags-backup.csv

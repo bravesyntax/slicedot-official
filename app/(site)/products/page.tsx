@@ -1,3 +1,4 @@
+import { buildMetadata, pageDefaults } from "@/lib/seo";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import ProductListing from "@/components/catalog/ProductListing";
@@ -9,13 +10,9 @@ type Props = { searchParams: Promise<SearchParams> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const { search } = await searchParams;
-  return {
-    title: search ? `Search: ${String(search).slice(0, 60)}` : "All Products",
-    description: "Browse our complete collection of products at SliceDot. Shop by category.",
-    alternates: { canonical: "/products" },
-    // Search results are endless and thin; links on them still count.
-    ...(search ? { robots: { index: false, follow: true } } : {}),
-  };
+  const meta = await buildMetadata("page", "products", pageDefaults("products"), { forceNoindex: !!search });
+  // Search results are endless and thin; links on them still count.
+  return search ? { ...meta, title: `Search: ${String(search).slice(0, 60)}` } : meta;
 }
 
 export default async function ProductsPage({ searchParams }: Props) {

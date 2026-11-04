@@ -16,3 +16,12 @@ export async function getClientIp(): Promise<string | null> {
 }
 
 export const field = (fd: FormData, name: string) => String(fd.get(name) ?? "").trim();
+
+export function isValidHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && !!url.hostname;
+  } catch {
+    return false;
+  }
+}

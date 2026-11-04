@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import LegalPage from "@/components/layout/LegalPage";
 import { RelatedLinks } from "@/components/site/ui";
 import { getStoreSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: "Terms & Conditions",
-  description: "Read the terms and conditions for using SliceDot.",
-  alternates: { canonical: "/terms" },
-};
+export const generateMetadata = () => pageMetadata("terms");
 
 const CONTENTS: [string, string][] = [
   ["introduction", "Introduction"], ["eligibility", "Eligibility"], ["account", "Account Registration"], ["products", "Products & Pricing"], ["orders", "Orders & Payment"],
@@ -20,6 +17,7 @@ const List = ({ items }: { items: string[] }) => <ul>{items.map((item) => <li ke
 export default async function TermsPage() {
   const { name, email } = await getStoreSettings();
   return (
+    <>
     <>
       <LegalPage title="Terms & Conditions" lead="Please read these terms carefully. By using our services, you agree to be bound by the following conditions." updated="December 2024" contents={CONTENTS}>
         <h2 id="introduction">Introduction</h2>
@@ -65,6 +63,8 @@ export default async function TermsPage() {
         <p>If you have any questions about these Terms and Conditions, please contact us at <a href={`mailto:${email}`}>{email}</a> or visit our <Link href="/contact">Contact Page</Link>.</p>
       </LegalPage>
       <RelatedLinks title="Related policies" links={[["Privacy Policy", "/privacy-policy"], ["Returns Policy", "/returns"], ["Shipping Policy", "/shipping"]]} />
+    </>
+      <SeoSchema type="page" entityKey="terms" />
     </>
   );
 }

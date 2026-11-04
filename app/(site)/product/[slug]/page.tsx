@@ -9,7 +9,9 @@ import ReviewSection from "@/components/product/ReviewSection";
 import { Section, SectionHeading, container } from "@/components/site/ui";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getActiveProductSlugs, getProductBySlug, getProductCollections, getProductImages, getProductReviews, getProductSeoTags, getRelatedProducts, getTrendingSearches, productColors } from "@/lib/catalog";
-import { SITE_NAME, SITE_URL } from "@/lib/config";
+import { SITE_URL } from "@/lib/config";
+import { buildMetadata, productSeoDefaults } from "@/lib/seo";
+import SeoSchema from "@/components/SeoSchema";
 import { categoryUrl, productImage, productUrl } from "@/lib/routes";
 import { getReviewSettings } from "@/lib/settings";
 
@@ -25,16 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return {};
-  const title = product.meta_title || `${product.name} | Buy Online`;
-  const description = product.meta_description || (product.description ?? product.short_description ?? "").slice(0, 155);
-  const image = product.og_image || product.image;
-  return {
-    title: { absolute: product.meta_title || `${product.name} | Buy Online at SliceDot` },
-    description,
-    keywords: product.meta_keywords || undefined,
-    alternates: { canonical: productUrl(product.slug) },
-    openGraph: { siteName: SITE_NAME, type: "website", locale: "en_IN", title: product.og_title || title, description: product.og_description || description, url: productUrl(product.slug), images: image ? [productImage(image)] : undefined },
-  };
+  return buildMetadata("product", String(product.id), productSeoDefaults(product));
 }
 
 const TagLinks = ({ title, links }: { title: string; links: [string, string][] }) => (
@@ -157,7 +150,7 @@ export default async function ProductPage({ params }: Props) {
           name: product.name,
           description: product.meta_description || product.short_description || undefined,
           sku: product.sku || undefined,
-          image: images.map((i) => `${SITE_URL}${productImage(i.path)}`),
+          image: images.map((i) => new URL(productImage(i.path), SITE_URL).href),
           brand: product.vendor ? { "@type": "Brand", name: product.vendor } : undefined,
           offers: {
             "@type": "Offer",
@@ -170,6 +163,7 @@ export default async function ProductPage({ params }: Props) {
           aggregateRating: reviews.length ? { "@type": "AggregateRating", ratingValue: average.toFixed(1), reviewCount: reviews.length } : undefined,
         }}
       />
+      <SeoSchema type="product" entityKey={String(product.id)} />
     </>
   );
 }

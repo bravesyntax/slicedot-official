@@ -1,15 +1,12 @@
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import { AlertCircle, CalendarClock, MapPinned, PackageCheck, Truck } from "lucide-react";
-import type { Metadata } from "next";
 import { CtaLink, IconChip, PageHero, Section, SectionHeading, container } from "@/components/site/ui";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { SpotlightCard } from "@/components/velora/spotlight-card";
 
-export const metadata: Metadata = {
-  title: "Shipping Information",
-  description: "Learn about shipping options, delivery times, and charges at SliceDot.",
-  alternates: { canonical: "/shipping" },
-};
+export const generateMetadata = () => pageMetadata("shipping");
 
 const HIGHLIGHTS = [
   { icon: Truck, value: "FREE", label: "Orders ₹499+" },
@@ -41,6 +38,7 @@ const NOTES = [
 
 export default function ShippingPage() {
   return (
+    <>
     <>
       <PageHero eyebrow="Shipping" title="Shipping Information">
         Fast, reliable delivery across India. Track your order every step of the way.
@@ -140,6 +138,8 @@ export default function ShippingPage() {
           <CtaLink href="/faq" variant="outline" arrow={false}>View FAQs</CtaLink>
         </div>
       </Section>
+    </>
+      <SeoSchema type="page" entityKey="shipping" />
     </>
   );
 }

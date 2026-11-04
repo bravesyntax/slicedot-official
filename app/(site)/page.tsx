@@ -1,5 +1,6 @@
+import SeoSchema from "@/components/SeoSchema";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight, BadgeCheck, Check, Gift, Headset, Layers, Package, RefreshCw, ShieldCheck, Truck, Zap } from "lucide-react";
-import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
@@ -12,7 +13,7 @@ import { BorderBeam } from "@/components/velora/border-beam";
 import { Marquee } from "@/components/velora/marquee";
 import { SpotlightCard } from "@/components/velora/spotlight-card";
 import { getCategoryProducts, getFeaturedProducts, getHomeFaqs, getLatestProducts, getRootCategories, getTrendingProducts } from "@/lib/catalog";
-import { SITE_NAME, SITE_URL } from "@/lib/config";
+import { SITE_URL } from "@/lib/config";
 import { categoryImage, categoryUrl } from "@/lib/routes";
 import { getSeoSettings, getStoreSettings } from "@/lib/settings";
 
@@ -42,16 +43,7 @@ const FALLBACK_FAQS = [
   { question: "Are the products genuine?", answer: "Absolutely. All products are sourced from trusted manufacturers and undergo quality checks before listing." },
 ];
 
-export async function generateMetadata(): Promise<Metadata> {
-  const seo = await getSeoSettings();
-  return {
-    title: { absolute: seo.title || "SliceDot | Everything You Need, All in One Place" },
-    description: seo.description,
-    keywords: seo.keywords,
-    alternates: { canonical: "/" },
-    openGraph: { siteName: SITE_NAME, type: "website", locale: "en_IN", title: seo.title, description: seo.description, url: "/", images: ["/assets/logo-black.png"] },
-  };
-}
+export const generateMetadata = () => pageMetadata("home");
 
 function ViewAll({ href, label = "View all" }: { href: string; label?: string }) {
   return (
@@ -315,10 +307,10 @@ export default async function HomePage() {
       <JsonLd
         data={{
           "@context": "https://schema.org",
-          "@type": "Organization",
-          name: store.name,
+          "@type": seo.orgType,
+          name: seo.orgName,
           url: SITE_URL,
-          logo: `${SITE_URL}/assets/logo-black.png`,
+          logo: new URL(seo.orgLogo || "/assets/logo-black.png", SITE_URL).href,
           contactPoint: { "@type": "ContactPoint", telephone: store.phone, contactType: "customer service", email: store.email },
           address: seo.address.street ? { "@type": "PostalAddress", streetAddress: seo.address.street, addressLocality: seo.address.city, addressRegion: seo.address.state, postalCode: seo.address.postal, addressCountry: seo.address.country } : undefined,
           sameAs: Object.values(store.socials).filter(Boolean),
@@ -333,6 +325,7 @@ export default async function HomePage() {
           potentialAction: { "@type": "SearchAction", target: `${SITE_URL}/products?search={search_term_string}`, "query-input": "required name=search_term_string" },
         }}
       />
+      <SeoSchema type="page" entityKey="home" />
     </>
   );
 }
