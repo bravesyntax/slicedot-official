@@ -1,12 +1,15 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { SITE_LIVE } from "./config";
 
 // Razorpay keys come only from the environment. Outside production a live key is refused, so testing can't take real money.
+// On the live site a test key is refused, so no order can be marked paid without real money. Customers then see COD only.
 export function razorpayKeys() {
   const keyId = process.env.RAZORPAY_KEY_ID ?? "";
   const secret = process.env.RAZORPAY_KEY_SECRET ?? "";
   if (!keyId || !secret) return null;
   if (process.env.NODE_ENV !== "production" && keyId.startsWith("rzp_live_")) return null;
+  if (SITE_LIVE && keyId.startsWith("rzp_test_")) return null;
   return { keyId, secret };
 }
 
