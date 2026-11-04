@@ -1,0 +1,211 @@
+// Converts the phpMyAdmin MySQL/MariaDB dump into Postgres SQL for Neon.
+// Usage: node scripts/convert-mysql-dump.mjs "<path to dump.sql>"
+// Writes db/schema.sql and db/data.sql (identity sequences are synced at the end of data.sql).
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const src = process.argv[2];
+if (!src) {
+  console.error("Usage: node scripts/convert-mysql-dump.mjs <dump.sql>");
+  process.exit(1);
+}
+const dump = fs.readFileSync(src, "utf8");
+const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "db");
+fs.mkdirSync(outDir, { recursive: true });
+
+const q = (name) => `"${name}"`;
+
+// ── Column type mapping ───────────────────────────────────────
+function mapColumn(line) {
+  const m = line.match(/^\s*`([^`]+)`\s+(.*?),?\s*$/);
+  if (!m) return null;
+  const [, name] = m;
+  let def = m[2];
+  const onUpdate = /ON UPDATE current_timestamp\(\)/i.test(def);
+  def = def
+    .replace(/\s*COMMENT\s+'(?:[^'\\]|\\.|'')*'/gi, "")
+    .replace(/\s*CHARACTER SET \w+/gi, "")
+    .replace(/\s*COLLATE \w+/gi, "")
+    .replace(/\s*CHECK \(json_valid\(`[^`]+`\)\)/gi, "")
+    .replace(/\s*ON UPDATE current_timestamp\(\)/gi, "")
+    .replace(/current_timestamp\(\)/gi, "CURRENT_TIMESTAMP")
+    .replace(/\s+UNSIGNED/gi, "")
+    // Remaining column CHECKs (rating bounds): same expression, Postgres identifier quoting.
+    .replace(/`([^`]+)`/g, '"$1"');
+
+  const t = def.match(/^(\w+)(\([^)]*\))?/);
+  const base = t[1].toLowerCase();
+  const args = t[2] || "";
+  let rest = def.slice(t[0].length);
+  let type;
+  switch (base) {
+    case "tinyint":
+    case "smallint":
+    case "year":
+      type = "smallint";
+      break;
+    case "int":
+    case "mediumint":
+      type = "integer";
+      break;
+    case "bigint":
+      type = "bigint";
+      break;
+    case "varchar":
+      type = `varchar${args}`;
+      break;
+    case "char":
+      type = `char${args}`;
+      break;
+    case "text":
+    case "mediumtext":
+    case "longtext":
+    case "enum":
+      type = "text";
+      break;
+    case "decimal":
+      type = `numeric${args}`;
+      break;
+    case "datetime":
+    case "timestamp":
+      type = "timestamp";
+      break;
+    case "date":
+      type = "date";
+      break;
+    default:
+      throw new Error(`Unmapped type: ${base} in "${line}"`);
+  }
+  // timestamps that are NULL-able with a default: "NULL DEFAULT x" → "DEFAULT x"
+  rest = rest.replace(/^\s+NULL\b/i, "");
+  return { name, sql: `  ${q(name)} ${type}${rest}`, onUpdate };
+}
+
+// ── Parse CREATE TABLE blocks ─────────────────────────────────
+const tables = new Map(); // name → { columns: [], onUpdateCols: [] }
+for (const m of dump.matchAll(/CREATE TABLE `([^`]+)` \(\n([\s\S]*?)\n\) ENGINE[^;]*;/g)) {
+  const [, name, body] = m;
+  const cols = body.split("\n").map(mapColumn).filter(Boolean);
+  tables.set(name, {
+    columns: cols,
+    onUpdateCols: cols.filter((c) => c.onUpdate).map((c) => c.name),
+    identity: null,
+  });
+}
+
+// ── Parse ALTER TABLE blocks (keys, auto-increment, FKs) ───────
+const constraints = [];
+const indexes = [];
+const fks = [];
+for (const m of dump.matchAll(/ALTER TABLE `([^`]+)`\n([\s\S]*?);\n/g)) {
+  const [, table, body] = m;
+  // Prefix lengths such as `slug`(191) are a MySQL index limit; Postgres indexes the whole value.
+  const cols = (s) => s.split(",").map((c) => c.trim().replace(/\(\d+\)$/, "").replace(/`([^`]+)`/, '"$1"')).join(", ");
+  for (const raw of body.split(/,\n/)) {
+    const line = raw.trim();
+    let k;
+    if ((k = line.match(/^ADD PRIMARY KEY \((.+)\)$/))) {
+      constraints.push(`ALTER TABLE ${q(table)} ADD PRIMARY KEY (${cols(k[1])});`);
+    } else if ((k = line.match(/^ADD UNIQUE KEY `([^`]+)` \((.+)\)$/))) {
+      constraints.push(`ALTER TABLE ${q(table)} ADD CONSTRAINT ${q(`${table}_${k[1]}`)} UNIQUE (${cols(k[2])});`);
+    } else if ((k = line.match(/^ADD KEY `([^`]+)` \((.+)\)$/))) {
+      indexes.push(`CREATE INDEX ${q(`${table}_${k[1]}`)} ON ${q(table)} (${cols(k[2])});`);
+    } else if ((k = line.match(/^MODIFY `([^`]+)` .*AUTO_INCREMENT/))) {
+      tables.get(table).identity = k[1];
+    } else if ((k = line.match(/^ADD CONSTRAINT `([^`]+)` FOREIGN KEY \((.+?)\) REFERENCES `([^`]+)` \((.+?)\)(.*)$/))) {
+      // The dump can reference a table it doesn't contain (currencies); that constraint can't exist here.
+      if (!tables.has(k[3])) {
+        console.warn(`Skipped FK ${k[1]}: table ${k[3]} is not in the dump`);
+        continue;
+      }
+      fks.push(`ALTER TABLE ${q(table)} ADD CONSTRAINT ${q(k[1])} FOREIGN KEY (${cols(k[2])}) REFERENCES ${q(k[3])} (${cols(k[4])})${k[5]} DEFERRABLE INITIALLY IMMEDIATE;`);
+    } else if (line) {
+      throw new Error(`Unhandled ALTER line for ${table}: ${line}`);
+    }
+  }
+}
+
+// ── schema.sql ────────────────────────────────────────────────
+let schema = `-- Generated by scripts/convert-mysql-dump.mjs — do not edit by hand.
+CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at := CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+`;
+for (const [name, t] of tables) {
+  const cols = t.columns.map((c) =>
+    c.name === t.identity ? c.sql.replace(/ integer NOT NULL/, " integer GENERATED BY DEFAULT AS IDENTITY") : c.sql,
+  );
+  schema += `DROP TABLE IF EXISTS ${q(name)} CASCADE;\nCREATE TABLE ${q(name)} (\n${cols.join(",\n")}\n);\n\n`;
+}
+schema += constraints.join("\n") + "\n\n" + indexes.join("\n") + "\n\n" + fks.join("\n") + "\n\n";
+for (const [name, t] of tables) {
+  for (const col of t.onUpdateCols) {
+    if (col !== "updated_at" && col !== "last_updated") throw new Error(`ON UPDATE on unexpected column ${name}.${col}`);
+  }
+  if (t.onUpdateCols.includes("updated_at")) {
+    schema += `CREATE TRIGGER ${q(`${name}_set_updated_at`)} BEFORE UPDATE ON ${q(name)} FOR EACH ROW EXECUTE FUNCTION set_updated_at();\n`;
+  }
+}
+fs.writeFileSync(path.join(outDir, "schema.sql"), schema);
+
+// ── Convert INSERT statements ─────────────────────────────────
+// Re-tokenize each MySQL literal and emit a Postgres literal.
+function convertValues(s) {
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === "'") {
+      let val = "";
+      i++;
+      while (i < s.length) {
+        const c = s[i];
+        if (c === "\\") {
+          const n = s[i + 1];
+          val += { n: "\n", r: "\r", t: "\t", 0: "", Z: "\x1a", "'": "'", '"': '"', "\\": "\\" }[n] ?? n;
+          i += 2;
+        } else if (c === "'" && s[i + 1] === "'") {
+          val += "'";
+          i += 2;
+        } else if (c === "'") {
+          i++;
+          break;
+        } else {
+          val += c;
+          i++;
+        }
+      }
+      out += "'" + val.replace(/'/g, "''") + "'";
+    } else {
+      out += ch;
+      i++;
+    }
+  }
+  return out;
+}
+
+// Tables are dumped alphabetically, so child rows can precede their parents;
+// FK checks are deferred to COMMIT (load-db.mjs runs this inside a transaction).
+let data = "-- Generated by scripts/convert-mysql-dump.mjs — do not edit by hand.\nSET CONSTRAINTS ALL DEFERRED;\n";
+const insertRe = /^INSERT INTO `([^`]+)` \(([^)]+)\) VALUES\n([\s\S]*?\));$/gm;
+let count = 0;
+for (const m of dump.matchAll(insertRe)) {
+  const [, table, colList, values] = m;
+  const cols = colList.replace(/`([^`]+)`/g, '"$1"');
+  data += `INSERT INTO ${q(table)} (${cols}) VALUES\n${convertValues(values)};\n`;
+  count++;
+}
+for (const [name, t] of tables) {
+  if (t.identity) {
+    data += `SELECT setval(pg_get_serial_sequence('${q(name)}', '${t.identity}'), COALESCE((SELECT MAX(${q(t.identity)}) FROM ${q(name)}), 0) + 1, false);\n`;
+  }
+}
+fs.writeFileSync(path.join(outDir, "data.sql"), data);
+
+console.log(`Tables: ${tables.size}, INSERT statements: ${count}`);
+console.log(`Wrote ${path.join(outDir, "schema.sql")} and data.sql`);
