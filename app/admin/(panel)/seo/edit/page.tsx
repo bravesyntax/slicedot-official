@@ -10,6 +10,8 @@ import { SITE_URL } from "@/lib/config";
 import type { SeoEntity } from "@/lib/seo";
 import { DESCRIPTION_RANGE, TITLE_RANGE } from "@/lib/seo-pages";
 import { resetSeoMeta, saveSeoMeta } from "../actions";
+import { aiSeoCopy } from "../../ai-actions";
+import { aiConfigured } from "@/lib/ai";
 
 export const metadata = { title: "SEO · Edit" };
 
@@ -105,6 +107,7 @@ export default async function SeoEditPage({ searchParams }: Props) {
         titleRange={TITLE_RANGE as [number, number]}
         descriptionRange={DESCRIPTION_RANGE as [number, number]}
         action={saveSeoMeta}
+        suggest={aiConfigured() ? aiSeoCopy.bind(null, t.type, t.key) : undefined}
       />
     </SeoShell>
   );

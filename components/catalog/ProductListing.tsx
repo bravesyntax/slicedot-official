@@ -3,7 +3,8 @@ import Link from "next/link";
 import { after } from "next/server";
 import ProductCard from "@/components/home/ProductCard";
 import { CtaLink, container } from "@/components/site/ui";
-import { getCategoryTree, getFilterColors, listProducts } from "@/lib/catalog";
+import { getCategoryTree, getFilterColors, getSearchVocabulary, listProducts } from "@/lib/catalog";
+import { correctQuery, isLoggableSearch, searchTokens } from "@/lib/search";
 import { sql } from "@/lib/db";
 import { parseFilters, queryWith, type SearchParams } from "@/lib/listing";
 import { cn } from "@/lib/utils";
@@ -21,13 +22,25 @@ type Props = {
 
 export default async function ProductListing({ searchParams, basePath, title, description, crumbs, category }: Props) {
   const filters = parseFilters(searchParams);
-  const [{ items, total, pages, page }, tree, colors] = await Promise.all([
+  const [first, tree, colors] = await Promise.all([
     listProducts({ ...filters, categoryId: category?.id }),
     getCategoryTree(),
     getFilterColors(),
   ]);
+  // Nothing found: try the closest spellings the catalog uses ("parfume" → "parfum").
+  let corrected: string | null = null;
+  let result = first;
+  if (filters.search && first.total === 0) {
+    corrected = correctQuery(searchTokens(filters.search), await getSearchVocabulary());
+    if (corrected) {
+      const retry = await listProducts({ ...filters, search: corrected, categoryId: category?.id });
+      if (retry.total > 0) result = retry;
+      else corrected = null;
+    }
+  }
+  const { items, total, pages, page } = result;
   // Feeds the trending searches in the admin. Only the first page, so paging through results counts once.
-  if (filters.search && filters.page === 1) {
+  if (filters.search && filters.page === 1 && isLoggableSearch(filters.search)) {
     const term = filters.search.toLowerCase();
     after(() => Promise.resolve(sql`INSERT INTO search_logs (search_query, results_count) VALUES (${term}, ${total})`).then(() => undefined).catch((err) => console.error("[search log]", err)));
   }
@@ -39,6 +52,7 @@ export default async function ProductListing({ searchParams, basePath, title, de
       <Crumbs items={crumbs} />
       <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">{filters.search ? `Results for "${filters.search}"` : title}</h1>
       {description && !filters.search && <p className="mt-1 line-clamp-2 max-w-2xl text-sm text-muted-foreground">{description}</p>}
+      {corrected && <p className="mt-1 text-sm text-muted-foreground" role="status">No exact matches, so showing results for <strong className="text-foreground">{corrected}</strong>.</p>}
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[14rem_1fr]">
         <SidebarFilters {...filterProps} />
@@ -47,7 +61,7 @@ export default async function ProductListing({ searchParams, basePath, title, de
             <p className="text-sm text-muted-foreground" role="status">{total} {total === 1 ? "product" : "products"}</p>
             <div className="flex items-center gap-2">
               <MobileFilters {...filterProps} />
-              <SortSelect value={filters.sort} />
+              <SortSelect value={filters.sort} searching={!!filters.search} />
             </div>
           </div>
 

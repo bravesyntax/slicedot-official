@@ -101,7 +101,7 @@ export function clipDescription(text: string, max = 155) {
 
 export function pageDefaults(slug: string): SeoDefaults {
   const def = seoPageDef(slug);
-  return { title: def?.title ?? SITE_NAME, suffix: slug !== "home", description: def?.description, path: def?.path ?? `/${slug}` };
+  return { title: def?.title ?? SITE_NAME, suffix: slug !== "home" && (def?.title.length ?? 0) <= 48, description: def?.description, path: def?.path ?? `/${slug}` };
 }
 
 /** Home takes its title, description and keywords from the site-wide settings. */
@@ -132,8 +132,9 @@ type CategorySeoFields = { slug: string; name: string; meta_title: string | null
 
 export function categorySeoDefaults(c: CategorySeoFields): SeoDefaults {
   return {
-    title: c.meta_title || c.name,
-    suffix: true,
+    title: c.meta_title || `Buy ${c.name} Online at Best Prices`,
+    // A saved title that already names the store doesn't get the suffix twice.
+    suffix: !/slicedot/i.test(c.meta_title ?? ""),
     description: c.meta_description || clipDescription(c.description ?? "") || `Shop ${c.name} at ${SITE_NAME}.`,
     path: categoryUrl(c.slug),
     image: c.image ? categoryImage(c.image) : "",

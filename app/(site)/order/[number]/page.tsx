@@ -1,4 +1,4 @@
-import { CheckCircle2, FileText } from "lucide-react";
+import { CheckCircle2, FileText, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -57,6 +57,19 @@ export default async function OrderPage({ params, searchParams }: Props) {
           {canCancel(order) && <CancelOrder number={order.order_number} />}
         </div>
       </div>
+
+      {order.tracking_number && order.order_status !== "cancelled" && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+          <p className="flex items-center gap-3 text-sm">
+            <Truck className="size-5 shrink-0" aria-hidden="true" />
+            <span>
+              <span className="block font-medium">{order.order_status === "delivered" ? "Delivered" : "On its way"}{order.courier_name ? ` with ${order.courier_name}` : ""}</span>
+              <span className="block text-muted-foreground">Tracking number: <span className="font-mono">{order.tracking_number}</span></span>
+            </span>
+          </p>
+          {order.tracking_url && <Button asChild variant="outline" className="rounded-full"><a href={order.tracking_url} target="_blank" rel="noopener noreferrer">Track package</a></Button>}
+        </div>
+      )}
 
       {order.order_status === "cancelled" && (
         <p className="mt-4 rounded-xl border bg-muted/40 p-3 text-sm">

@@ -106,3 +106,29 @@ export async function markHelpful(reviewId: number): Promise<number | null> {
   });
   return counted;
 }
+
+export type AlertState = { status: "idle" | "ok" | "error"; message: string };
+
+const ALERTS_PER_HOUR = 5;
+
+/** "Notify me" on a sold-out product. Bots get a quiet success; one row per product and address. */
+export async function requestStockAlert(_prev: AlertState, fd: FormData): Promise<AlertState> {
+  const done: AlertState = { status: "ok", message: "Done. We'll email you once when it's back in stock." };
+  if (field(fd, "website_url")) return done;
+  const age = Date.now() - Number(field(fd, "form_ts"));
+  if (!Number.isFinite(age) || age < 1_500 || age > 3_600_000) return done;
+  const email = sanitizeEmail(field(fd, "email")).toLowerCase();
+  if (!isValidEmail(email)) return { status: "error", message: "Please enter a valid email address." };
+  const productId = parseInt(field(fd, "product_id"), 10);
+  const [product] = await rows<{ id: number }>(sql`SELECT id FROM products WHERE id = ${productId || 0} AND status = 'active'`);
+  if (!product) return { status: "error", message: "This product is no longer available." };
+  const ip = (await getClientIp()) ?? "unknown";
+  const [{ n }] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM stock_alerts WHERE ip_address = ${ip} AND created_at > LOCALTIMESTAMP - INTERVAL '1 hour'`);
+  if (n >= ALERTS_PER_HOUR) return { status: "error", message: "Too many requests. Please try again later." };
+  const customer = await getCustomer();
+  await sql`
+    INSERT INTO stock_alerts (product_id, email, customer_id, ip_address) VALUES (${product.id}, ${email}, ${customer?.id ?? null}, ${ip})
+    ON CONFLICT (product_id, lower(email)) DO UPDATE SET notified_at = NULL, created_at = LOCALTIMESTAMP
+  `;
+  return done;
+}

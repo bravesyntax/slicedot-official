@@ -8,10 +8,12 @@ import ProductView from "@/components/product/ProductView";
 import ReviewSection from "@/components/product/ReviewSection";
 import { Section, SectionHeading, container } from "@/components/site/ui";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { getActiveProductSlugs, getProductBySlug, getProductCollections, getProductImages, getProductReviews, getRelatedProducts, productColors } from "@/lib/catalog";
+import { getActiveProductSlugs, getProductBySlug, getProductCollections, getProductImages, getProductReviews, getBoughtTogether, getSimilarProducts, productColors } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/config";
 import { buildMetadata, productSeoDefaults } from "@/lib/seo";
 import SeoSchema from "@/components/SeoSchema";
+import { RecentlyViewed, TrackView } from "@/components/product/RecentlyViewed";
+import { FREE_SHIPPING_FROM, SHIPPING_FEE } from "@/lib/pricing";
 import { categoryUrl, productImage, productUrl } from "@/lib/routes";
 import { getReviewSettings } from "@/lib/settings";
 
@@ -46,10 +48,11 @@ export default async function ProductPage({ params }: Props) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [gallery, collections, related, reviews, reviewSettings] = await Promise.all([
+  const [gallery, collections, related, together, reviews, reviewSettings] = await Promise.all([
     getProductImages(product.id),
     getProductCollections(product.id),
-    getRelatedProducts(product.id, product.category_id),
+    getSimilarProducts(product),
+    getBoughtTogether(product.id),
     getProductReviews(product.id),
     getReviewSettings(),
   ]);
@@ -116,14 +119,26 @@ export default async function ProductPage({ params }: Props) {
         />
       </Section>
 
-      {related.length > 0 && (
-        <Section label="You may also like">
-          <SectionHeading title="You May Also Like" />
+      {together.length > 0 && (
+        <Section label="Frequently bought together">
+          <SectionHeading title="Frequently Bought Together" />
           <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {related.map((p) => <ProductCard key={p.id} product={p} />)}
+            {together.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </Section>
       )}
+
+      {related.length > 0 && (
+        <Section label="You may also like">
+          <SectionHeading title="Similar Products" />
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {related.slice(0, 8).map((p) => <ProductCard key={p.id} product={p} />)}
+          </div>
+        </Section>
+      )}
+
+      <TrackView product={{ id: product.id, slug: product.slug, name: product.name, price: product.price, image: product.image }} />
+      <RecentlyViewed excludeId={product.id} className={`${container} pb-14`} />
 
       <JsonLd
         data={{
@@ -140,6 +155,24 @@ export default async function ProductPage({ params }: Props) {
             priceCurrency: "INR",
             price: Number(product.price),
             availability: product.quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            itemCondition: "https://schema.org/NewCondition",
+            shippingDetails: {
+              "@type": "OfferShippingDetails",
+              shippingRate: { "@type": "MonetaryAmount", value: Number(product.price) >= FREE_SHIPPING_FROM ? 0 : SHIPPING_FEE, currency: "INR" },
+              shippingDestination: { "@type": "DefinedRegion", addressCountry: "IN" },
+              deliveryTime: {
+                "@type": "ShippingDeliveryTime",
+                handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 1, unitCode: "DAY" },
+                transitTime: { "@type": "QuantitativeValue", minValue: 3, maxValue: 7, unitCode: "DAY" },
+              },
+            },
+            hasMerchantReturnPolicy: {
+              "@type": "MerchantReturnPolicy",
+              applicableCountry: "IN",
+              returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+              merchantReturnDays: 7,
+              returnMethod: "https://schema.org/ReturnByMail",
+            },
           },
           // Only real, approved reviews.
           aggregateRating: reviews.length ? { "@type": "AggregateRating", ratingValue: average.toFixed(1), reviewCount: reviews.length } : undefined,

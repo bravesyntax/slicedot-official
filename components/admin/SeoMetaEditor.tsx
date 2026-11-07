@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Circle, Code2, Globe, Image as ImageIcon, Link2, Search, Share2, Target } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, Circle, Code2, Globe, Image as ImageIcon, Link2, Search, Share2, Sparkles, Target } from "lucide-react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { SubmitButton } from "./client";
 import { inputCls, labelCls, primaryBtn } from "./styles";
 
@@ -32,6 +32,8 @@ type Props = {
   titleRange: [number, number];
   descriptionRange: [number, number];
   action: (fd: FormData) => void;
+  /** Drafts a title, description and focus keyword with AI; absent when AI isn't set up. */
+  suggest?: () => Promise<{ ok: true; data: { title: string; description: string; focus_keyword: string } } | { ok: false; message: string }>;
 };
 
 type Check = { ok: boolean | null; text: string };
@@ -72,6 +74,17 @@ const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimE
 export default function SeoMetaEditor(p: Props) {
   const [v, setV] = useState(p.values);
   const set = <K extends keyof SeoEditorValues>(k: K, val: SeoEditorValues[K]) => setV((x) => ({ ...x, [k]: val }));
+  const [suggesting, startSuggest] = useTransition();
+  const [aiNote, setAiNote] = useState("");
+  const suggest = () =>
+    startSuggest(async () => {
+      if (!p.suggest) return;
+      setAiNote("Writing…");
+      const result = await p.suggest();
+      if (!result.ok) return setAiNote(result.message);
+      setV((x) => ({ ...x, title: result.data.title, description: result.data.description, focus_keyword: result.data.focus_keyword }));
+      setAiNote("Suggestion filled in. Check it, then save.");
+    });
 
   const title = v.title.trim() || p.defaults.title;
   const description = v.description.trim() || p.defaults.description;
@@ -124,7 +137,12 @@ export default function SeoMetaEditor(p: Props) {
       <input type="hidden" name="entity_key" value={p.entityKey} />
 
       <div className="min-w-0 space-y-6">
-        <Panel icon={Search} title="Search appearance">
+        <Panel
+          icon={Search}
+          title="Search appearance"
+          aside={p.suggest ? <button type="button" onClick={suggest} disabled={suggesting} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs hover:bg-muted"><Sparkles className="size-3.5" aria-hidden="true" />{suggesting ? "Writing…" : "Suggest with AI"}</button> : null}
+        >
+          {aiNote && <p className="-mt-2 mb-3 text-xs text-muted-foreground" role="status">{aiNote}</p>}
           <div className="space-y-5">
             <div>
               <label htmlFor="seo-title" className={labelCls}>

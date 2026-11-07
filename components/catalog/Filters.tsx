@@ -144,13 +144,14 @@ export function MobileFilters(props: FilterProps) {
   );
 }
 
-export function SortSelect({ value }: { value: string }) {
+export function SortSelect({ value, searching = false }: { value: string; searching?: boolean }) {
   const { set } = useQuery();
+  const fallback = searching ? "relevance" : "newest";
   return (
-    <Select value={value} onValueChange={(v) => set("sort", v === "newest" ? "" : v)}>
+    <Select value={value} onValueChange={(v) => set("sort", v === fallback ? "" : v)}>
       <SelectTrigger aria-label="Sort products" className="w-48 rounded-full"><SelectValue /></SelectTrigger>
       <SelectContent>
-        {SORTS.map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+        {SORTS.filter(([key]) => searching || key !== "relevance").map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
       </SelectContent>
     </Select>
   );

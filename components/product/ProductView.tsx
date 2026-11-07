@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import WishlistButton from "@/components/account/WishlistButton";
 import AddToCartButton from "@/components/cart/AddToCartButton";
+import NotifyMe from "./NotifyMe";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice, productImage } from "@/lib/routes";
@@ -144,6 +145,7 @@ export default function ProductView({ productId, name, price, comparePrice, quan
           <AddToCartButton productId={productId} inStock={inStock} quantity={count} color={color} size={size} />
           <WishlistButton productId={productId} color={color} size={size} labelled />
         </div>
+        {!inStock && <NotifyMe productId={productId} />}
 
         <ul className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border">
           {TRUST.map(({ icon: Icon, title, text }) => (

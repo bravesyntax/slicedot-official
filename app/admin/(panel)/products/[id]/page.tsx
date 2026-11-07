@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { SubmitButton } from "@/components/admin/client";
+import AiProductWriter from "@/components/admin/AiProductWriter";
 import ImagePicker from "@/components/admin/ImagePicker";
+import { aiConfigured } from "@/lib/ai";
 import { AdminPage, BackLink, Card, inputCls, labelCls, primaryBtn, secondaryBtn, Toggle } from "@/components/admin/ui";
 import { uploadMode } from "@/lib/admin/images";
 import { rows, sql } from "@/lib/db";
@@ -81,6 +83,7 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
         <div className="min-w-0 space-y-6">
           <Panel title="Details">
             <div className="grid gap-4 md:grid-cols-2">
+              {aiConfigured() && <div className="md:col-span-2"><AiProductWriter /></div>}
               <div className="md:col-span-2"><Field name="name" label="Name" value={p?.name} required /></div>
               <div className="md:col-span-2"><Field name="slug" label="URL" value={p?.slug} hint={p ? "Changing this adds a redirect from the old URL automatically." : "Leave empty to build it from the name."} /></div>
               <div className="md:col-span-2">

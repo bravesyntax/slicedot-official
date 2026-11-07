@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { rows, sql } from "./db";
 import { PRICE_RANGES, type ListingFilters } from "./listing";
+import { searchTokens } from "./search";
 
 export type ProductCard = {
   id: number;
@@ -153,10 +154,41 @@ export const getHomeFaqs = () =>
     ORDER BY sort_order ASC LIMIT 6
   `);
 
+// How closely a misspelt search word must match a word in a product name (pg_trgm word_similarity, 0 to 1).
+const FUZZY = 0.5;
+
 // User text inside LIKE: % and _ must match literally.
 const like = (text: string) => `%${text.replace(/[\\%_]/g, "\\$&")}%`;
 
+/** Every search word has to appear in the product, its category, its tags or its search keywords. A longer word also
+ * matches a product name that spells it almost the same way ("lotin" finds "lotion"), through Postgres's pg_trgm. */
+function searchMatch(query: string) {
+  const tokens = searchTokens(query);
+  if (!tokens.length) return sql``;
+  return tokens
+    .map((t) => {
+      const w = like(t);
+      const near = t.length >= 4 ? sql`OR word_similarity(${t}::text, lower(p.name)) >= ${FUZZY}::real` : sql``;
+      return sql`AND (p.name ILIKE ${w} ${near} OR p.short_description ILIKE ${w} OR p.description ILIKE ${w} OR p.sku ILIKE ${w} OR p.product_tags ILIKE ${w}
+        OR EXISTS (SELECT 1 FROM categories sc WHERE sc.id = p.category_id AND sc.name ILIKE ${w})
+        OR EXISTS (SELECT 1 FROM product_seo_tags pst JOIN seo_tags st ON st.id = pst.tag_id WHERE pst.product_id = p.id AND st.tag_name ILIKE ${w}))`;
+    })
+    .reduce((a, b) => sql`${a} ${b}`);
+}
+
+/** Words the catalog actually uses, for "did you mean" when a search finds nothing. */
+export const getSearchVocabulary = cache(async () => {
+  const data = await rows<{ text: string }>(sql`
+    SELECT name AS text FROM products WHERE status = 'active'
+    UNION ALL SELECT name FROM categories WHERE status = 'active'
+    UNION ALL SELECT tag_name FROM seo_tags WHERE status = 'active'
+  `);
+  return data.flatMap((r) => searchTokens(r.text));
+});
+
 const LISTING_ORDER = {
+  // Searches order by relevanceOrder(); without a search, "best match" means newest.
+  relevance: sql`p.created_at DESC`,
   newest: sql`p.created_at DESC`,
   "price-low": sql`p.price ASC, p.id DESC`,
   "price-high": sql`p.price DESC, p.id DESC`,
@@ -165,6 +197,12 @@ const LISTING_ORDER = {
   discount: sql`CASE WHEN p.compare_price > p.price THEN 1 - p.price / p.compare_price ELSE 0 END DESC, p.created_at DESC`,
   recommended: sql`p.is_featured DESC, COALESCE(${realRating}, 0) * 0.6 + LEAST(${realReviewCount} / 10.0, 5) * 0.4 DESC, p.created_at DESC`,
 };
+
+/** Best match first: names closest to the search, then names that contain it whole, then featured and newest. */
+function relevanceOrder(search: string) {
+  const q = searchTokens(search).join(" ") || search.toLowerCase();
+  return sql`word_similarity(${q}::text, lower(p.name)) DESC, (lower(p.name) LIKE ${like(q)}) DESC, p.is_featured DESC, p.created_at DESC`;
+}
 
 export async function listProducts(f: ListingFilters & { categoryId?: number }, perPage = 12) {
   const anyOf = (conditions: ReturnType<typeof sql>[]) => conditions.reduce((a, b) => sql`${a} OR ${b}`);
@@ -178,7 +216,7 @@ export async function listProducts(f: ListingFilters & { categoryId?: number }, 
         SELECT c2.id FROM categories c2 JOIN tree ON c2.parent_id = tree.id WHERE c2.status = 'active'
       ) SELECT id FROM tree
     )` : sql``}
-    ${f.search ? sql`AND (p.name ILIKE ${like(f.search)} OR p.description ILIKE ${like(f.search)} OR p.short_description ILIKE ${like(f.search)} OR p.sku ILIKE ${like(f.search)} OR p.product_tags ILIKE ${like(f.search)} OR EXISTS (SELECT 1 FROM product_seo_tags pst JOIN seo_tags st ON st.id = pst.tag_id WHERE pst.product_id = p.id AND st.tag_name ILIKE ${like(f.search)}))` : sql``}
+    ${f.search ? searchMatch(f.search) : sql``}
     ${ranges.length ? sql`AND (${anyOf(ranges.map((r) => sql`(p.price >= ${r.min} AND p.price <= ${r.max})`))})` : sql``}
     ${f.color.length ? sql`AND (${anyOf(f.color.map((name) => sql`(p.colors_json ILIKE ${like(name)} OR p.color ILIKE ${like(name)})`))})` : sql``}
     ${f.rating ? sql`AND COALESCE(${realRating}, 0) >= ${f.rating}` : sql``}
@@ -195,7 +233,7 @@ export async function listProducts(f: ListingFilters & { categoryId?: number }, 
   const items = await rows<ProductCard>(sql`
     SELECT ${cardColumns} FROM products p LEFT JOIN categories c ON p.category_id = c.id
     WHERE ${where}
-    ORDER BY ${LISTING_ORDER[f.sort]}
+    ORDER BY ${f.sort === "relevance" && f.search ? relevanceOrder(f.search) : LISTING_ORDER[f.sort]}
     LIMIT ${perPage} OFFSET ${(page - 1) * perPage}
   `);
   return { items, total, pages, page };
@@ -251,11 +289,32 @@ export const getProductCollections = (productId: number) =>
     WHERE m.product_id = ${productId} AND pc.status = 'active' ORDER BY pc.sort_order ASC
   `);
 
-export const getRelatedProducts = (productId: number, categoryId: number | null) =>
+/** Products like this one: same category first, then the same family of categories, then a similar price. */
+export const getSimilarProducts = (product: { id: number; category_id: number | null; price: string }) =>
   rows<ProductCard>(sql`
     SELECT ${cardColumns} FROM products p LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.status = 'active' AND p.id <> ${productId}
-    ORDER BY (p.category_id IS NOT DISTINCT FROM ${categoryId}) DESC, p.created_at DESC LIMIT 4
+    WHERE p.status = 'active' AND p.id <> ${product.id}
+    ORDER BY
+      (p.category_id IS NOT DISTINCT FROM ${product.category_id}::int)::int * 4
+      + (c.parent_id IS NOT NULL AND c.parent_id = (SELECT parent_id FROM categories WHERE id = ${product.category_id}::int))::int * 2
+      + (abs(p.price - ${product.price}::numeric) <= ${product.price}::numeric * 0.4)::int
+      + (p.quantity > 0)::int DESC,
+      p.created_at DESC
+    LIMIT 8
+  `);
+
+/** What other customers bought in the same order as this product, most often first. */
+export const getBoughtTogether = (productId: number) =>
+  rows<ProductCard>(sql`
+    SELECT ${cardColumns} FROM (
+      SELECT b.product_id, count(*) AS n FROM order_items a
+      JOIN order_items b ON b.order_id = a.order_id AND b.product_id IS NOT NULL AND b.product_id <> a.product_id
+      JOIN orders o ON o.id = a.order_id AND o.order_status NOT IN ('cancelled', 'payment_pending')
+      WHERE a.product_id = ${productId} GROUP BY b.product_id
+    ) pair
+    JOIN products p ON p.id = pair.product_id AND p.status = 'active' AND p.quantity > 0
+    LEFT JOIN categories c ON p.category_id = c.id
+    ORDER BY pair.n DESC, p.created_at DESC LIMIT 4
   `);
 
 export const getWishlistProducts = (customerId: number) =>
@@ -293,7 +352,7 @@ export async function searchSuggestions(q: string) {
   const [products, categories] = await Promise.all([
     rows<{ name: string; slug: string; price: string; image: string | null }>(sql`
       SELECT p.name, p.slug, p.price, p.image FROM products p
-      WHERE p.status = 'active' AND (p.name ILIKE ${term} OR p.description ILIKE ${term} OR p.short_description ILIKE ${term} OR p.sku ILIKE ${term} OR p.meta_keywords ILIKE ${term})
+      WHERE p.status = 'active' ${searchMatch(q)}
       ORDER BY CASE WHEN p.name ILIKE ${starts} THEN 1 WHEN p.name ILIKE ${term} THEN 2 ELSE 3 END, p.name LIMIT 8
     `),
     rows<{ name: string; slug: string }>(sql`

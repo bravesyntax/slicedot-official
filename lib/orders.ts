@@ -138,6 +138,10 @@ export type OrderDetail = {
   cancellation_reason: string | null;
   refund_status: string | null;
   refund_amount: string | null;
+  courier_name: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  shipped_at: Date | null;
 };
 
 export type OrderLine = { id: number; product_name: string; product_sku: string | null; variant_color: string | null; variant_size: string | null; quantity: number; price: string; total: string; image: string | null; slug: string | null };
@@ -146,7 +150,7 @@ export type OrderLine = { id: number; product_name: string; product_sku: string 
 export async function getCustomerOrder(number: string, customer: Pick<Customer, "id" | "email">) {
   const [order] = await rows<OrderDetail>(sql`
     SELECT id, order_number, customer_name, customer_email, customer_phone, shipping_address, payment_method, payment_status, order_status,
-      subtotal, tax, shipping_cost, total, created_at, cancellation_reason, refund_status, refund_amount
+      subtotal, tax, shipping_cost, total, created_at, cancellation_reason, refund_status, refund_amount, courier_name, tracking_number, tracking_url, shipped_at
     FROM orders
     WHERE order_number = ${number} AND order_status <> ${AWAITING_PAYMENT}
       AND (customer_id = ${customer.id} OR lower(customer_email) = ${customer.email.toLowerCase()})

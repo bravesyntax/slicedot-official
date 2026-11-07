@@ -7,7 +7,7 @@ import { rows, sql } from "@/lib/db";
 import { escapeHtml, sendMail } from "@/lib/mailer";
 import { AWAITING_PAYMENT } from "@/lib/orders";
 import { SITE_URL } from "@/lib/config";
-import { field } from "@/lib/validation";
+import { field, isValidHttpUrl } from "@/lib/validation";
 
 const STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 const PAYMENTS = ["pending", "paid", "failed", "refunded"];
@@ -29,6 +29,10 @@ export async function updateOrder(fd: FormData) {
   const status = field(fd, "order_status");
   const payment = field(fd, "payment_status");
   const reason = field(fd, "cancellation_reason").slice(0, 255);
+  const courier = field(fd, "courier_name").slice(0, 100) || null;
+  const tracking = field(fd, "tracking_number").slice(0, 100) || null;
+  const trackingUrl = field(fd, "tracking_url").slice(0, 500) || null;
+  if (trackingUrl && !isValidHttpUrl(trackingUrl)) await finish("error", "The tracking link must be a full https:// address.", back);
   if (!STATUSES.includes(status) || !PAYMENTS.includes(payment)) await finish("error", "Pick a valid status.", back);
 
   const outcome = await sql.begin(async (tx) => {
@@ -42,6 +46,8 @@ export async function updateOrder(fd: FormData) {
     const refund = cancelling && order.payment_method !== "cod" && payment === "paid";
     await tx`
       UPDATE orders SET order_status = ${status}, payment_status = ${payment}, updated_at = LOCALTIMESTAMP,
+        courier_name = ${courier}, tracking_number = ${tracking}, tracking_url = ${trackingUrl},
+        shipped_at = CASE WHEN ${status}::text IN ('shipped', 'delivered') THEN COALESCE(shipped_at, LOCALTIMESTAMP) ELSE shipped_at END,
         cancellation_reason = CASE WHEN ${cancelling}::boolean THEN ${reason || "Cancelled by the store"}::text ELSE cancellation_reason END,
         cancelled_at = CASE WHEN ${cancelling}::boolean THEN LOCALTIMESTAMP ELSE cancelled_at END,
         refund_status = CASE WHEN ${refund}::boolean THEN 'processing' ELSE refund_status END,
@@ -59,6 +65,7 @@ export async function updateOrder(fd: FormData) {
 
   if (outcome.error) await finish("error", outcome.error, back);
   const { order, statusChanged } = outcome;
+  const trackingLine = tracking ? `<p>Tracking number: <strong>${escapeHtml(tracking)}</strong>${courier ? ` (${escapeHtml(courier)})` : ""}${trackingUrl ? `<br><a href="${escapeHtml(trackingUrl)}">Track your package</a>` : ""}</p>` : "";
 
   if (order && statusChanged && fd.get("notify") && STATUS_LINE[status] && !(process.env.NODE_ENV !== "production" && order.customer_email.endsWith("@example.com"))) {
     const number = escapeHtml(order.order_number);
@@ -66,7 +73,7 @@ export async function updateOrder(fd: FormData) {
       sendMail({
         to: order.customer_email,
         subject: `Order ${order.order_number}: ${status}`,
-        html: `<p>Hi ${escapeHtml(order.customer_name)},</p><p>Your SliceDot order <strong>${number}</strong> ${STATUS_LINE[status]}.</p><p><a href="${SITE_URL}/order/${encodeURIComponent(order.order_number)}">View your order</a></p>`,
+        html: `<p>Hi ${escapeHtml(order.customer_name)},</p><p>Your SliceDot order <strong>${number}</strong> ${STATUS_LINE[status]}.</p>${status === "shipped" ? trackingLine : ""}<p><a href="${SITE_URL}/order/${encodeURIComponent(order.order_number)}">View your order</a></p>`,
       }),
     );
   }

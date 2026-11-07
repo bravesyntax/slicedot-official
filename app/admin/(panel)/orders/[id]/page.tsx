@@ -14,7 +14,7 @@ export const metadata = { title: "Order" };
 type Order = {
   id: number; order_number: string; customer_id: number | null; customer_name: string; customer_email: string; customer_phone: string | null; shipping_address: string; billing_address: string;
   payment_method: string | null; payment_status: string; order_status: string; subtotal: string; tax: string; shipping_cost: string; total: string; notes: string | null; razorpay_payment_id: string | null;
-  cancellation_reason: string | null; cancelled_at: Date | null; refund_status: string | null; refund_amount: string | null; refund_notes: string | null; refund_id: string | null; created_at: Date;
+  cancellation_reason: string | null; cancelled_at: Date | null; courier_name: string | null; tracking_number: string | null; tracking_url: string | null; refund_status: string | null; refund_amount: string | null; refund_notes: string | null; refund_id: string | null; created_at: Date;
 };
 
 const Row = ({ label, children, strong }: { label: string; children: ReactNode; strong?: boolean }) => (
@@ -27,7 +27,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const [[order], items, logs] = await Promise.all([
     rows<Order>(sql`
       SELECT id, order_number, customer_id, customer_name, customer_email, customer_phone, shipping_address, billing_address, payment_method, payment_status, order_status, subtotal, tax, shipping_cost, total, notes,
-        razorpay_payment_id, cancellation_reason, cancelled_at, refund_status, refund_amount, refund_notes, refund_id, created_at
+        razorpay_payment_id, cancellation_reason, cancelled_at, courier_name, tracking_number, tracking_url, refund_status, refund_amount, refund_notes, refund_id, created_at
       FROM orders WHERE id = ${id} AND order_status <> ${AWAITING_PAYMENT}
     `),
     rows<{ id: number; product_id: number | null; product_name: string; product_sku: string | null; variant_color: string | null; variant_size: string | null; quantity: number; price: string; total: string }>(sql`
@@ -106,6 +106,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   {["pending", "paid", "failed", "refunded"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              <fieldset className="grid gap-3 rounded-lg border p-3">
+                <legend className="px-1 text-xs font-medium text-muted-foreground">Shipping and tracking</legend>
+                <div><label htmlFor="courier_name" className={labelCls}>Courier</label><input id="courier_name" name="courier_name" maxLength={100} defaultValue={order.courier_name ?? ""} placeholder="Delhivery, Blue Dart…" className={inputCls} /></div>
+                <div><label htmlFor="tracking_number" className={labelCls}>Tracking number</label><input id="tracking_number" name="tracking_number" maxLength={100} defaultValue={order.tracking_number ?? ""} className={inputCls} /></div>
+                <div><label htmlFor="tracking_url" className={labelCls}>Tracking link</label><input id="tracking_url" name="tracking_url" type="url" maxLength={500} defaultValue={order.tracking_url ?? ""} placeholder="https://…" className={inputCls} /></div>
+                <p className="text-[11px] text-muted-foreground">Shown on the customer&apos;s order page and in the shipping email.</p>
+              </fieldset>
               {!cancelled && (
                 <div>
                   <label htmlFor="cancellation_reason" className={labelCls}>Reason, if cancelling</label>

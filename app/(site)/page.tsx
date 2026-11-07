@@ -5,6 +5,7 @@ import JsonLd from "@/components/JsonLd";
 import ProductCard from "@/components/home/ProductCard";
 import Slider from "@/components/home/Slider";
 import SeoSchema from "@/components/SeoSchema";
+import { RecentlyViewed } from "@/components/product/RecentlyViewed";
 import { container } from "@/components/site/ui";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { BlurFade } from "@/components/velora/blur-fade";
@@ -162,6 +163,8 @@ export default async function HomePage() {
           ))}
         </ul>
       </section>
+
+      <RecentlyViewed className={`${container} pt-10`} />
 
       {deals.length > 0 && (
         <Shelf title="Top deals" subtitle={biggestDeal ? `Save up to ${biggestDeal}% on these picks` : undefined} href="/products?sort=discount&discount=10">

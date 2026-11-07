@@ -1,6 +1,7 @@
 // Product listing filters: the URL query string is the source of truth, so filtered pages can be shared and reloaded.
 
 export const SORTS = [
+  ["relevance", "Best Match"],
   ["recommended", "Recommended"],
   ["newest", "Newest First"],
   ["popularity", "Popularity"],
@@ -44,9 +45,11 @@ const list = (v: string | string[] | undefined) => one(v).split(",").map((s) => 
 export function parseFilters(sp: SearchParams): ListingFilters {
   // ?sort=popular is the old home page link.
   const sort = one(sp.sort) === "popular" ? "popularity" : one(sp.sort);
+  const search = one(sp.search).trim().slice(0, 100);
   return {
-    search: one(sp.search).trim().slice(0, 100),
-    sort: SORTS.some(([key]) => key === sort) ? (sort as ListingSort) : "newest",
+    search,
+    // A search is shown best match first unless another order is picked; "best match" only means something with a search.
+    sort: SORTS.some(([key]) => key === sort) && !(sort === "relevance" && !search) ? (sort as ListingSort) : search ? "relevance" : "newest",
     page: Math.max(1, Math.min(10_000, parseInt(one(sp.page), 10) || 1)),
     price: list(sp.price).filter((v) => PRICE_RANGES.some((r) => r.value === v)),
     color: list(sp.color).slice(0, 20).map((c) => c.slice(0, 50)),

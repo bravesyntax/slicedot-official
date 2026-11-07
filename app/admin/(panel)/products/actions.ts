@@ -2,7 +2,9 @@
 
 import { requireAdmin } from "@/lib/admin/auth";
 import { checkbox, finish, intField, makeSlug, refreshPublicSite } from "@/lib/admin/common";
+import { after } from "next/server";
 import { deleteImage, isOwnUpload } from "@/lib/admin/images";
+import { notifyBackInStock } from "@/lib/automation";
 import { rows, sql } from "@/lib/db";
 import { productUrl } from "@/lib/routes";
 import { field } from "@/lib/validation";
@@ -58,7 +60,7 @@ export async function saveProduct(fd: FormData) {
     if (dup) await finish("error", `SKU ${sku} is already used by another product.`, back);
   }
 
-  const [old] = id ? await rows<{ slug: string; status: string; image: string | null }>(sql`SELECT slug, status, image FROM products WHERE id = ${id}`) : [];
+  const [old] = id ? await rows<{ slug: string; status: string; image: string | null; quantity: number | null }>(sql`SELECT slug, status, image, quantity FROM products WHERE id = ${id}`) : [];
   if (id && !old) await finish("error", "That product no longer exists.", LIST);
   const before = id ? await rows<{ image_path: string }>(sql`SELECT image_path FROM product_images WHERE product_id = ${id}`) : [];
   const existing = [old?.image ?? null, ...before.map((b) => b.image_path)];
@@ -115,6 +117,9 @@ export async function saveProduct(fd: FormData) {
     }
     return pid;
   });
+
+  // Back in stock: everyone who asked gets one email.
+  if (old && (old.quantity ?? 0) <= 0 && quantity > 0 && status === "active") after(() => notifyBackInStock(productId).catch((err) => console.error("[back in stock]", err)));
 
   const kept = new Set(images.map((i) => i.path));
   await Promise.all(existing.filter((p): p is string => !!p && !kept.has(p)).map((p) => deleteImage("products", p)));
