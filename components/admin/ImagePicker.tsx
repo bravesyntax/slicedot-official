@@ -1,7 +1,9 @@
 "use client";
 
 import { ArrowUp, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { useState, useTransition } from "react";
+import { aiAltTexts } from "@/app/admin/(panel)/ai-tools";
 import { FileDrop } from "@/components/velora/file-drop";
 import { categoryImage, productImage } from "@/lib/routes";
 import { inputCls } from "./styles";
@@ -39,8 +41,19 @@ export const NoUploads = () => (
   </p>
 );
 
-export default function ImagePicker({ kind, mode, name, initial, multiple = false, details = false }: { kind: Kind; mode: Mode; name: string; initial: PickedImage[]; multiple?: boolean; details?: boolean }) {
+export default function ImagePicker({ kind, mode, name, initial, multiple = false, details = false, aiAlt = false }: { kind: Kind; mode: Mode; name: string; initial: PickedImage[]; multiple?: boolean; details?: boolean; aiAlt?: boolean }) {
   const [images, setImages] = useState(initial);
+  const [writing, startWriting] = useTransition();
+  // Alt text for every image from what the AI sees in it; the admin can still edit each one.
+  const writeAlts = () =>
+    startWriting(async () => {
+      setStatus("Looking at the images…");
+      const productName = (document.getElementById("name") as HTMLInputElement | null)?.value ?? "";
+      const r = await aiAltTexts({ name: productName, paths: images.map((i) => i.path) });
+      if (!r.ok) return setStatus(r.message);
+      setImages((list) => list.map((img) => ({ ...img, alt: r.data.find((a) => a.path === img.path)?.alt ?? img.alt })));
+      setStatus(`Alt text written for ${r.data.length} image${r.data.length === 1 ? "" : "s"}. Check it, then save.`);
+    });
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const url = kind === "products" ? productImage : categoryImage;
@@ -67,6 +80,11 @@ export default function ImagePicker({ kind, mode, name, initial, multiple = fals
   return (
     <div className="space-y-3">
       <input type="hidden" name={name} value={JSON.stringify(images)} />
+      {aiAlt && details && images.length > 0 && (
+        <button type="button" onClick={writeAlts} disabled={writing} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-60">
+          <Sparkles className="size-3.5" aria-hidden="true" /> {writing ? "Writing…" : "Write alt text with AI"}
+        </button>
+      )}
       {images.length > 0 && (
         <ul className={multiple ? "grid gap-3 sm:grid-cols-2" : "max-w-xs"}>
           {images.map((img, i) => (

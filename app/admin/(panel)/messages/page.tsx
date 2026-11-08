@@ -1,8 +1,10 @@
 import { Mail, MailOpen, Trash2 } from "lucide-react";
+import { AiMessageReply } from "@/components/admin/AiTools";
 import { ConfirmButton } from "@/components/admin/client";
 import { AdminPage, Card, CardHead, EmptyState, FilterTabs, formatDate, iconBtnDelete, iconBtnEdit, Pagination, paging } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/admin/auth";
 import { finish, intField } from "@/lib/admin/common";
+import { aiConfigured } from "@/lib/ai";
 import { rows, sql } from "@/lib/db";
 import { field } from "@/lib/validation";
 
@@ -38,6 +40,7 @@ export default async function MessagesPage({ searchParams }: Props) {
       SELECT id, name, email, phone, subject, message, is_read, created_at FROM contact_messages ${where} ORDER BY created_at DESC, id DESC LIMIT ${perPage} OFFSET ${offset}
     `),
   ]);
+  const ai = aiConfigured();
   const current = `${BASE}?${new URLSearchParams({ ...(filter !== "all" ? { filter } : {}), ...(page > 1 ? { page: String(page) } : {}) })}`;
 
   return (
@@ -56,6 +59,7 @@ export default async function MessagesPage({ searchParams }: Props) {
                   <p className="mt-2 text-xs text-muted-foreground">
                     {m.name} · <a href={`mailto:${m.email}`} className="break-all underline underline-offset-4">{m.email}</a>{m.phone ? ` · ${m.phone}` : ""} · {formatDate(m.created_at)}
                   </p>
+                  {ai && <AiMessageReply messageId={m.id} email={m.email} />}
                 </div>
                 <div className="flex gap-1">
                   <form action={toggleRead}><input type="hidden" name="id" value={m.id} /><input type="hidden" name="return_to" value={current} /><button type="submit" className={iconBtnEdit} title={m.is_read ? "Mark unread" : "Mark read"} aria-label={m.is_read ? "Mark unread" : "Mark read"}>{m.is_read ? <Mail className="size-4" aria-hidden="true" /> : <MailOpen className="size-4" aria-hidden="true" />}</button></form>

@@ -1,6 +1,7 @@
 import { ExternalLink, Pencil, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmButton, SubmitButton } from "@/components/admin/client";
+import { AiCategoryWriter } from "@/components/admin/AiTools";
 import ImagePicker from "@/components/admin/ImagePicker";
 import SeoBasicsPanel from "@/components/admin/SeoBasicsPanel";
 import { Pill } from "@/components/admin/SeoShell";
@@ -76,6 +77,7 @@ export default async function CategoriesPage({ searchParams }: Props) {
           <h2 className="font-semibold">{editing ? `Edit ${editing.name}` : "Add a category"}</h2>
           <form key={editing?.id ?? "new"} action={saveCategory} className="mt-4 space-y-4">
             {editing && <input type="hidden" name="id" value={editing.id} />}
+            {aiConfigured() && <AiCategoryWriter categoryId={editing?.id ?? null} />}
             <div><label htmlFor="name" className={labelCls}>Name</label><input id="name" name="name" required maxLength={100} defaultValue={editing?.name} className={inputCls} /></div>
             <div><label htmlFor="slug" className={labelCls}>URL</label><input id="slug" name="slug" maxLength={100} defaultValue={editing?.slug} className={inputCls} /><p className="mt-1 text-[11px] text-muted-foreground">{editing ? "Changing this adds a redirect from the old URL." : "Leave empty to build it from the name."}</p></div>
             <div>

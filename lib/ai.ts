@@ -39,11 +39,16 @@ const SeoCopy = z.object({
 });
 export type SeoCopy = z.infer<typeof SeoCopy>;
 
-function ask<T extends z.ZodType>(schema: T, prompt: string): Promise<z.infer<T>> {
-  return process.env.ANTHROPIC_API_KEY ? askClaude(schema, prompt) : askGemini(schema, prompt);
-}
+/** A picture sent along with the prompt, already downloaded. */
+export type AiImage = { mime: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; data: string };
 
-async function askClaude<T extends z.ZodType>(schema: T, prompt: string): Promise<z.infer<T>> {
+/** One structured answer from whichever AI is set up. Images, if any, come before the prompt. */
+export function askAi<T extends z.ZodType>(schema: T, prompt: string, images: AiImage[] = []): Promise<z.infer<T>> {
+  return process.env.ANTHROPIC_API_KEY ? askClaude(schema, prompt, images) : askGemini(schema, prompt, images);
+}
+const ask = askAi;
+
+async function askClaude<T extends z.ZodType>(schema: T, prompt: string, images: AiImage[]): Promise<z.infer<T>> {
   const client = new Anthropic();
   try {
     const response = await client.beta.messages.parse({
@@ -54,7 +59,7 @@ async function askClaude<T extends z.ZodType>(schema: T, prompt: string): Promis
       fallbacks: "default",
       output_config: { effort: "low", format: betaZodOutputFormat(schema) },
       system: RULES,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: [...images.map((i) => ({ type: "image" as const, source: { type: "base64" as const, media_type: i.mime, data: i.data } })), { type: "text" as const, text: prompt }] }],
     });
     if (response.stop_reason === "refusal" || !response.parsed_output) throw new AiProblem("The AI couldn't write this one. Try again with more product details.");
     return response.parsed_output as z.infer<T>;
@@ -67,25 +72,32 @@ async function askClaude<T extends z.ZodType>(schema: T, prompt: string): Promis
   }
 }
 
-async function askGemini<T extends z.ZodType>(schema: T, prompt: string): Promise<z.infer<T>> {
+async function askGemini<T extends z.ZodType>(schema: T, prompt: string, images: AiImage[]): Promise<z.infer<T>> {
   const jsonSchema: Record<string, unknown> = z.toJSONSchema(schema);
   delete jsonSchema.$schema;
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: RULES }] },
+    contents: [{ role: "user", parts: [...images.map((i) => ({ inlineData: { mimeType: i.mime, data: i.data } })), { text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json", responseJsonSchema: jsonSchema },
+  });
   let response: Response;
-  try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: RULES }] },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", responseJsonSchema: jsonSchema },
-      }),
-      signal: AbortSignal.timeout(45_000),
-    });
-  } catch (err) {
-    console.error("[ai] gemini", err);
-    throw new AiProblem("The AI didn't respond. Try again.");
+  // The free tier is often briefly overloaded (500/503): wait a moment and try again, twice.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+        body,
+        signal: AbortSignal.timeout(45_000),
+      });
+    } catch (err) {
+      console.error("[ai] gemini", err);
+      throw new AiProblem("The AI didn't respond. Try again.");
+    }
+    if (![500, 503].includes(response.status) || attempt === 2) break;
+    await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
   }
+  if (response.status === 503) throw new AiProblem("The free AI is busy right now. Try again in a minute.");
   if (response.status === 400 || response.status === 401 || response.status === 403) {
     const body = await response.text();
     console.error("[ai] gemini", response.status, body.slice(0, 500));
@@ -107,10 +119,24 @@ async function askGemini<T extends z.ZodType>(schema: T, prompt: string): Promis
 
 export class AiProblem extends Error {}
 
+/** Downloads a picture for the AI to look at. Anything that isn't a small image is skipped. */
+export async function fetchAiImage(url: string): Promise<AiImage | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (!res.ok || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mime)) return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length > 4_000_000) return null;
+    return { mime: mime as AiImage["mime"], data: bytes.toString("base64") };
+  } catch {
+    return null;
+  }
+}
+
 /** Where the copy will live and what it must pass (lib/seo-checks.ts), plus what failed last time. */
 export type SeoBrief = { path: string; avoidTitles: string[]; feedback: string[] };
 
-function seoRules(b: SeoBrief) {
+export function seoRules(b: SeoBrief) {
   const words = urlWords(b.path);
   const lines = [
     "SEO rules. The copy is scored automatically and must pass every rule:",

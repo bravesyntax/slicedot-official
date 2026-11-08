@@ -1,8 +1,10 @@
 import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmButton, SubmitButton } from "@/components/admin/client";
+import { AiFaqDrafts } from "@/components/admin/AiTools";
 import SeoShell, { Pill } from "@/components/admin/SeoShell";
 import { Card, CardHead, EmptyState, iconBtnDelete, iconBtnEdit, inputCls, labelCls, smallPrimaryBtn, Toggle } from "@/components/admin/ui";
+import { aiConfigured } from "@/lib/ai";
 import { rows, sql } from "@/lib/db";
 import { deleteFaq, saveFaq } from "../actions";
 
@@ -36,6 +38,7 @@ export default async function FaqPage({ searchParams }: Props) {
               {editing && <Link href="/admin/seo/faq" className="text-xs text-muted-foreground hover:text-foreground">Cancel</Link>}
             </div>
           </form>
+          {aiConfigured() && <div className="mt-6 border-t pt-5"><AiFaqDrafts save={saveFaq} /></div>}
         </Card>
         <Card>
           <CardHead title="Questions" description={`${list.length} total`} />

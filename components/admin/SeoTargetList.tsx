@@ -1,6 +1,8 @@
 import { ChevronRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { editHref, ISSUES, worstSeverity, type SeoTarget } from "@/lib/admin/seo-audit";
+import { aiConfigured } from "@/lib/ai";
+import { AiFixAllSeo } from "./AiTools";
 import { Pill } from "./SeoShell";
 import { Card, EmptyState, FilterTabs } from "./ui";
 
@@ -35,6 +37,7 @@ export default function SeoTargetList({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {extra}
+          {aiConfigured() && <AiFixAllSeo items={targets.filter((t) => !t.forcedNoindex && t.score < 100).map((t) => ({ type: t.type, key: t.key, label: t.label }))} />}
           <FilterTabs
             tabs={[
               ["all", `All (${targets.length})`],

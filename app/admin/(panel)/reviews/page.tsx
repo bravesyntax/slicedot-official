@@ -1,10 +1,12 @@
 import { Check, Star, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { ConfirmButton, SubmitButton } from "@/components/admin/client";
+import { AiReviewReply } from "@/components/admin/AiTools";
 import { Pill } from "@/components/admin/SeoShell";
 import { AdminPage, Card, CardHead, EmptyState, FilterTabs, formatDate, iconBtnDelete, iconBtnEdit, inputCls, Pagination, paging, secondaryBtn } from "@/components/admin/ui";
 import { requireAdmin } from "@/lib/admin/auth";
 import { finish, intField, refreshPublicSite } from "@/lib/admin/common";
+import { aiConfigured } from "@/lib/ai";
 import { rows, sql } from "@/lib/db";
 import { field } from "@/lib/validation";
 
@@ -62,6 +64,7 @@ export default async function ReviewsPage({ searchParams }: Props) {
   ]);
   const count = (s: string) => counts.find((c) => c.status === s)?.n ?? 0;
   const current = `${BASE}?${new URLSearchParams({ status, ...(page > 1 ? { page: String(page) } : {}) })}`;
+  const ai = aiConfigured();
   const Hidden = ({ id }: { id: number }) => <><input type="hidden" name="id" value={id} /><input type="hidden" name="return_to" value={current} /></>;
 
   return (
@@ -96,9 +99,10 @@ export default async function ReviewsPage({ searchParams }: Props) {
                 </div>
                 <form action={saveReply} className="mt-3 flex gap-2">
                   <Hidden id={r.id} />
-                  <input name="reply" defaultValue={r.admin_reply ?? ""} placeholder="Public reply from the store (optional)" aria-label="Public reply" maxLength={2000} className={inputCls} />
+                  <input id={`reply-${r.id}`} name="reply" defaultValue={r.admin_reply ?? ""} placeholder="Public reply from the store (optional)" aria-label="Public reply" maxLength={2000} className={inputCls} />
                   <SubmitButton className={secondaryBtn}>Save</SubmitButton>
                 </form>
+                {ai && <div className="mt-2"><AiReviewReply reviewId={r.id} /></div>}
               </li>
             ))}
           </ul>

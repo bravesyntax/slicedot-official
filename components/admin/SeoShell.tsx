@@ -1,11 +1,11 @@
-import { ArrowRightLeft, CircleHelp, FileText, FolderTree, Gauge, Hash, Package, Settings2, TrendingUp, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, CircleHelp, SearchX, FileText, FolderTree, Gauge, Hash, Package, Settings2, TrendingUp, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AdminPage } from "./ui";
 
 // Frame for every screen of Admin → SEO: the page header plus the section tabs.
 
-export type SeoTab = "overview" | "pages" | "products" | "categories" | "redirects" | "keywords" | "trending" | "faq" | "settings";
+export type SeoTab = "overview" | "pages" | "products" | "categories" | "redirects" | "keywords" | "searches" | "trending" | "faq" | "settings";
 
 const TABS: [SeoTab, string, string, LucideIcon][] = [
   ["overview", "Overview", "/admin/seo", Gauge],
@@ -14,6 +14,7 @@ const TABS: [SeoTab, string, string, LucideIcon][] = [
   ["categories", "Categories", "/admin/seo/categories", FolderTree],
   ["redirects", "Redirects", "/admin/seo/redirects", ArrowRightLeft],
   ["keywords", "Keywords", "/admin/seo/keywords", Hash],
+  ["searches", "Searches", "/admin/seo/searches", SearchX],
   ["trending", "Trending", "/admin/seo/trending", TrendingUp],
   ["faq", "FAQ", "/admin/seo/faq", CircleHelp],
   ["settings", "Settings", "/admin/seo/settings", Settings2],

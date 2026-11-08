@@ -100,7 +100,7 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
             </div>
           </Panel>
           <Panel title="Images">
-            <ImagePicker kind="products" mode={uploadMode()} name="images" initial={images} multiple details />
+            <ImagePicker kind="products" mode={uploadMode()} name="images" initial={images} multiple details aiAlt={aiConfigured()} />
           </Panel>
           <Panel title="Pricing and stock">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
