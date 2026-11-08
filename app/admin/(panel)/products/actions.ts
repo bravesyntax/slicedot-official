@@ -2,6 +2,7 @@
 
 import { requireAdmin } from "@/lib/admin/auth";
 import { checkbox, finish, intField, makeSlug, refreshPublicSite } from "@/lib/admin/common";
+import { saveSeoBasics } from "@/lib/admin/seo-basics";
 import { after } from "next/server";
 import { deleteImage, isOwnUpload } from "@/lib/admin/images";
 import { notifyBackInStock } from "@/lib/automation";
@@ -117,6 +118,8 @@ export async function saveProduct(fd: FormData) {
     }
     return pid;
   });
+
+  await saveSeoBasics("product", String(productId), fd);
 
   // Back in stock: everyone who asked gets one email.
   if (old && (old.quantity ?? 0) <= 0 && quantity > 0 && status === "active") after(() => notifyBackInStock(productId).catch((err) => console.error("[back in stock]", err)));

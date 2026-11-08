@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/admin/auth";
 import { checkbox, finish, intField, makeSlug, refreshPublicSite } from "@/lib/admin/common";
 import { deleteImage, isOwnUpload } from "@/lib/admin/images";
+import { saveSeoBasics } from "@/lib/admin/seo-basics";
 import { rows, sql } from "@/lib/db";
 import { categoryUrl } from "@/lib/routes";
 import { field } from "@/lib/validation";
@@ -43,9 +44,10 @@ export async function saveCategory(fd: FormData) {
     name, slug, parent_id: parentId, level: trail.length, category_path: trail.join(" > ").slice(0, 500), description: field(fd, "description") || null, image,
     image_alt: field(fd, "image_alt") || null, sort_order: intField(fd, "sort_order"), status: checkbox(fd, "is_active") ? "active" : "inactive",
   };
-  await sql.begin(async (tx) => {
+  const categoryId = await sql.begin(async (tx) => {
+    let cid = id;
     if (id) await tx`UPDATE categories SET ${tx(values)}, updated_at = LOCALTIMESTAMP WHERE id = ${id}`;
-    else await tx`INSERT INTO categories ${tx(values)}`;
+    else [{ id: cid }] = await tx<{ id: number }[]>`INSERT INTO categories ${tx(values)} RETURNING id`;
     // A renamed category keeps its old URL working, and its rankings.
     if (old && old.slug !== slug) {
       const from = categoryUrl(old.slug);
@@ -55,7 +57,9 @@ export async function saveCategory(fd: FormData) {
         ON CONFLICT (old_url) DO UPDATE SET new_url = EXCLUDED.new_url, status = 'active'`;
       await tx`UPDATE seo_redirects SET new_url = ${to} WHERE new_url = ${from}`;
     }
+    return cid;
   });
+  await saveSeoBasics("category", String(categoryId), fd);
   if (old?.image && old.image !== image) await deleteImage("categories", old.image);
   refreshPublicSite();
   await finish("success", old && old.slug !== slug ? "Category saved. The old URL now redirects to the new one." : "Category saved.", LIST);

@@ -2,9 +2,13 @@ import { ExternalLink, Pencil, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmButton, SubmitButton } from "@/components/admin/client";
 import ImagePicker from "@/components/admin/ImagePicker";
+import SeoBasicsPanel from "@/components/admin/SeoBasicsPanel";
 import { Pill } from "@/components/admin/SeoShell";
 import { AdminPage, Card, CardHead, EmptyState, iconBtnDelete, iconBtnEdit, iconBtnView, inputCls, labelCls, smallPrimaryBtn, Th, Toggle } from "@/components/admin/ui";
 import { uploadMode } from "@/lib/admin/images";
+import { loadSeoBasics } from "@/lib/admin/seo-basics";
+import { aiConfigured } from "@/lib/ai";
+import { aiSeoCopy } from "../ai-actions";
 import { rows, sql } from "@/lib/db";
 import { categoryImage, categoryUrl } from "@/lib/routes";
 import { deleteCategory, saveCategory } from "./actions";
@@ -27,6 +31,7 @@ export default async function CategoriesPage({ searchParams }: Props) {
   const orphans = all.filter((c) => !ordered.some((o) => o.id === c.id)).map((c) => ({ ...c, depth: 0 }));
   const list = [...ordered, ...orphans];
   const editing = list.find((c) => c.id === Number(edit)) ?? null;
+  const seo = await loadSeoBasics("category", editing ? String(editing.id) : null);
 
   return (
     <AdminPage title="Categories">
@@ -87,6 +92,10 @@ export default async function CategoriesPage({ searchParams }: Props) {
             </div>
             <div><label htmlFor="image_alt" className={labelCls}>Image alt text</label><input id="image_alt" name="image_alt" defaultValue={editing?.image_alt ?? ""} className={inputCls} /></div>
             <div><label htmlFor="sort_order" className={labelCls}>Order</label><input id="sort_order" name="sort_order" type="number" defaultValue={editing?.sort_order ?? 0} className={inputCls} /></div>
+            <div className="rounded-xl border p-4">
+              <h3 className="mb-3 text-sm font-semibold">Search engine listing</h3>
+              <SeoBasicsPanel {...seo} compact pathPrefix="/category/" slug={editing?.slug ?? ""} editHref={editing ? `/admin/seo/edit?type=category&key=${editing.id}` : undefined} suggest={editing && aiConfigured() ? aiSeoCopy.bind(null, "category", String(editing.id)) : undefined} />
+            </div>
             <Toggle name="is_active" label="Active" defaultChecked={editing ? editing.status === "active" : true} />
             <div className="flex items-center gap-3">
               <SubmitButton className={smallPrimaryBtn}>{editing ? "Update" : "Add category"}</SubmitButton>

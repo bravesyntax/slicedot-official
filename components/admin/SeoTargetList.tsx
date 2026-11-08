@@ -65,6 +65,7 @@ export default function SeoTargetList({
                   <div className="truncate text-xs text-muted-foreground">{t.seo.description}</div>
                 </div>
                 <div className="relative z-10 flex flex-wrap items-center gap-1.5">
+                  {!t.forcedNoindex && <Pill tone={t.score === 100 ? "ok" : t.score >= 50 ? "warning" : "error"}>Score {t.score}</Pill>}
                   <Pill tone={t.record ? "ok" : "muted"}>{t.record ? "Custom" : "Default"}</Pill>
                   {t.forcedNoindex && <Pill tone="muted">{t.forcedNoindex} · not indexed</Pill>}
                   {!t.forcedNoindex && !worst && <Pill tone="ok">All good</Pill>}

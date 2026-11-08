@@ -2,6 +2,7 @@ import "server-only";
 import { SITE_URL } from "@/lib/config";
 import { rows, sql } from "@/lib/db";
 import { applySeo, categorySeoDefaults, homeDefaults, pageDefaults, productSeoDefaults, type ResolvedSeo, type SeoDefaults, type SeoEntity, type SeoRecord } from "@/lib/seo";
+import { seoChecks } from "@/lib/seo-checks";
 import { DESCRIPTION_RANGE, SEO_PAGES, TITLE_RANGE } from "@/lib/seo-pages";
 import { getSeoSettings, type SeoSettings } from "@/lib/settings";
 
@@ -11,7 +12,8 @@ import { getSeoSettings, type SeoSettings } from "@/lib/settings";
 export type IssueCode =
   | "title_short" | "title_long" | "title_duplicate"
   | "desc_short" | "desc_long" | "desc_duplicate"
-  | "noindex" | "no_image" | "keyword_missing" | "keyword_unset" | "canonical_elsewhere";
+  | "noindex" | "no_image" | "keyword_missing" | "keyword_unset" | "canonical_elsewhere"
+  | "keyword_not_in_desc" | "keyword_not_in_url" | "keyword_late";
 
 export type Severity = "error" | "warning" | "notice";
 
@@ -24,6 +26,9 @@ export const ISSUES: Record<IssueCode, { severity: Severity; label: string; help
   desc_long: { severity: "warning", label: "Description too long", help: `Over ${DESCRIPTION_RANGE[1]} characters; it will be truncated.` },
   desc_short: { severity: "warning", label: "Description too short", help: `Under ${DESCRIPTION_RANGE[0]} characters; Google may write its own snippet.` },
   keyword_missing: { severity: "warning", label: "Focus keyword not in title", help: "The focus keyword you set doesn't appear in the title." },
+  keyword_not_in_desc: { severity: "warning", label: "Focus keyword not in description", help: "The focus keyword you set doesn't appear in the meta description." },
+  keyword_not_in_url: { severity: "notice", label: "Focus keyword not in URL", help: "Pick a focus keyword made of words in the page's URL." },
+  keyword_late: { severity: "notice", label: "Focus keyword late in title", help: "Move the focus keyword towards the start of the title." },
   no_image: { severity: "notice", label: "No social image", help: "Links shared on WhatsApp, Instagram or X show no preview image." },
   keyword_unset: { severity: "notice", label: "No focus keyword", help: "Set a focus keyword so the editor can check your title and description against it." },
   canonical_elsewhere: { severity: "notice", label: "Canonical points elsewhere", help: "This URL tells Google another URL is the main version, so it's left out of the sitemap." },
@@ -44,6 +49,8 @@ export type SeoTarget = {
   /** Kept out of search by the site itself (inactive products, empty categories). */
   forcedNoindex: string | null;
   issues: IssueCode[];
+  /** The same 0–100 score the SEO editor shows for this URL. */
+  score: number;
 };
 
 export const TYPE_LABEL: Record<SeoEntity, string> = { page: "Page", product: "Product", category: "Category" };
@@ -79,7 +86,7 @@ function build(raw: Awaited<ReturnType<typeof loadRaw>>): SeoTarget[] {
   const out: SeoTarget[] = [];
   const push = (type: SeoEntity, key: string, label: string, meta: string, defaults: SeoDefaults, forcedNoindex: string | null = null) => {
     const record = recordOf.get(`${type}:${key}`) ?? null;
-    out.push({ type, key, label, meta, path: defaults.path, defaults, record, seo: applySeo(record, raw.settings, defaults), forcedNoindex, issues: [] });
+    out.push({ type, key, label, meta, path: defaults.path, defaults, record, seo: applySeo(record, raw.settings, defaults), forcedNoindex, issues: [], score: 0 });
   };
 
   for (const p of SEO_PAGES) push("page", p.slug, p.label, p.path, p.slug === "home" ? raw.home : pageDefaults(p.slug));
@@ -97,8 +104,20 @@ function build(raw: Awaited<ReturnType<typeof loadRaw>>): SeoTarget[] {
   const titles = count((t) => t.seo.title);
   const descs = count((t) => t.seo.description);
 
+  const liveTitles = live.map((t) => t.seo.title.toLowerCase());
+  const liveDescs = live.map((t) => t.seo.description.toLowerCase());
   for (const t of out) {
+    const self = live.indexOf(t);
+    const { checks, score } = seoChecks({
+      title: t.seo.title, description: t.seo.description, focusKeyword: t.seo.focusKeyword, path: t.path, image: t.seo.image, noindex: t.seo.noindex,
+      otherTitles: liveTitles.filter((_, n) => n !== self), otherDescriptions: liveDescs.filter((_, n) => n !== self),
+    });
+    t.score = score;
     if (t.forcedNoindex) continue;
+    const failed = (id: string) => checks.some((c) => c.id === id && c.ok === false);
+    if (failed("kw_desc")) t.issues.push("keyword_not_in_desc");
+    if (failed("kw_url")) t.issues.push("keyword_not_in_url");
+    if (failed("kw_start") && !failed("kw_title")) t.issues.push("keyword_late");
     const { title, description, noindex, image, focusKeyword, canonical } = t.seo;
     const i = t.issues;
     if (noindex) i.push("noindex");

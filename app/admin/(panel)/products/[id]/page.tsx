@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { SubmitButton } from "@/components/admin/client";
 import AiProductWriter from "@/components/admin/AiProductWriter";
 import ImagePicker from "@/components/admin/ImagePicker";
+import SeoBasicsPanel from "@/components/admin/SeoBasicsPanel";
+import { loadSeoBasics } from "@/lib/admin/seo-basics";
 import { aiConfigured } from "@/lib/ai";
 import { AdminPage, BackLink, Card, inputCls, labelCls, primaryBtn, secondaryBtn, Toggle } from "@/components/admin/ui";
 import { uploadMode } from "@/lib/admin/images";
@@ -51,13 +53,14 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
   const productId = isNew ? 0 : Number(id);
   if (!isNew && !(productId > 0)) notFound();
 
-  const [[product], categories, collections, chosen, gallery, tags] = await Promise.all([
+  const [[product], categories, collections, chosen, gallery, tags, seo] = await Promise.all([
     isNew ? Promise.resolve([] as Product[]) : rows<Product>(sql`SELECT * FROM products WHERE id = ${productId}`),
     rows<{ id: number; name: string; parent_id: number | null }>(sql`SELECT id, name, parent_id FROM categories ORDER BY sort_order, name`),
     rows<{ id: number; collection_name: string }>(sql`SELECT id, collection_name FROM product_collections ORDER BY sort_order, collection_name`),
     rows<{ collection_id: number }>(sql`SELECT collection_id FROM product_collection_map WHERE product_id = ${productId}`),
     rows<{ image_path: string; alt_text: string | null; color_name: string | null }>(sql`SELECT image_path, alt_text, color_name FROM product_images WHERE product_id = ${productId} ORDER BY sort_order, id`),
     rows<{ tag_name: string }>(sql`SELECT t.tag_name FROM product_seo_tags p JOIN seo_tags t ON t.id = p.tag_id WHERE p.product_id = ${productId} ORDER BY t.tag_name`),
+    loadSeoBasics("product", isNew ? null : String(productId)),
   ]);
   if (!isNew && !product) notFound();
   const p = product ?? null;
@@ -83,7 +86,7 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
         <div className="min-w-0 space-y-6">
           <Panel title="Details">
             <div className="grid gap-4 md:grid-cols-2">
-              {aiConfigured() && <div className="md:col-span-2"><AiProductWriter /></div>}
+              {aiConfigured() && <div className="md:col-span-2"><AiProductWriter productId={p?.id ?? null} /></div>}
               <div className="md:col-span-2"><Field name="name" label="Name" value={p?.name} required /></div>
               <div className="md:col-span-2"><Field name="slug" label="URL" value={p?.slug} hint={p ? "Changing this adds a redirect from the old URL automatically." : "Leave empty to build it from the name."} /></div>
               <div className="md:col-span-2">
@@ -121,6 +124,9 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
               <Field name="sku" label="SKU" value={p?.sku} />
               <Field name="barcode" label="Barcode" value={p?.barcode} />
             </div>
+          </Panel>
+          <Panel title="Search engine listing">
+            <SeoBasicsPanel {...seo} pathPrefix="/product/" slug={p?.slug ?? ""} editHref={p ? `/admin/seo/edit?type=product&key=${p.id}` : undefined} />
           </Panel>
         </div>
         <aside className="space-y-6 xl:sticky xl:top-20 xl:self-start">

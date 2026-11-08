@@ -2,6 +2,8 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { urlWords } from "./seo-checks";
+import { DESCRIPTION_RANGE, TITLE_RANGE } from "./seo-pages";
 
 // Writing help for the admin. Nothing here runs for customers, and nothing is saved until the admin reviews the text
 // and presses Save. It uses the Claude API when ANTHROPIC_API_KEY is set, otherwise Google Gemini's free tier when
@@ -23,17 +25,17 @@ Rules:
 const ProductCopy = z.object({
   short_description: z.string().describe("One sentence, at most 160 characters, saying what it is and why it is useful."),
   description: z.string().describe("80 to 150 words of plain text in 2 or 3 short paragraphs separated by a blank line."),
-  meta_title: z.string().describe("Search result title, 30 to 60 characters, starting with the product type, without the store name."),
-  meta_description: z.string().describe("Search result description, 120 to 155 characters."),
-  focus_keyword: z.string().describe("The 2 to 4 word phrase a shopper would search to find this product."),
+  meta_title: z.string().describe("Search result title. Follow the SEO rules."),
+  meta_description: z.string().describe("Search result description. Follow the SEO rules."),
+  focus_keyword: z.string().describe("Follow the SEO rules."),
   keywords: z.array(z.string()).describe("5 to 8 short search phrases, lower case."),
 });
 export type ProductCopy = z.infer<typeof ProductCopy>;
 
 const SeoCopy = z.object({
-  title: z.string().describe("Search result title, 30 to 60 characters."),
-  description: z.string().describe("Search result description, 120 to 155 characters, with a clear reason to click."),
-  focus_keyword: z.string().describe("The 2 to 4 word phrase this page should rank for."),
+  title: z.string().describe("Search result title. Follow the SEO rules."),
+  description: z.string().describe("Search result description with a clear reason to click. Follow the SEO rules."),
+  focus_keyword: z.string().describe("Follow the SEO rules."),
 });
 export type SeoCopy = z.infer<typeof SeoCopy>;
 
@@ -105,10 +107,29 @@ async function askGemini<T extends z.ZodType>(schema: T, prompt: string): Promis
 
 export class AiProblem extends Error {}
 
+/** Where the copy will live and what it must pass (lib/seo-checks.ts), plus what failed last time. */
+export type SeoBrief = { path: string; avoidTitles: string[]; feedback: string[] };
+
+function seoRules(b: SeoBrief) {
+  const words = urlWords(b.path);
+  const lines = [
+    "SEO rules. The copy is scored automatically and must pass every rule:",
+    words.length
+      ? `- focus_keyword: 1 to 4 consecutive words copied in the same order from these URL words: ${words.join(", ")}. Pick the run a shopper would search for (for example "${words.slice(0, 3).join(" ")}"). Lower case.`
+      : "- focus_keyword: the 2 to 4 word phrase this page should rank for. Lower case.",
+    `- Title: ${TITLE_RANGE[0]} to ${TITLE_RANGE[1]} characters counting spaces (aim for about ${TITLE_RANGE[1] - 8}), starting with the focus keyword word for word (capitalising it is fine).`,
+    `- Description: ${DESCRIPTION_RANGE[0]} to ${DESCRIPTION_RANGE[1]} characters counting spaces (aim for about ${DESCRIPTION_RANGE[1] - 15}), containing the focus keyword word for word.`,
+    "- Count the characters before answering.",
+  ];
+  if (b.avoidTitles.length) lines.push(`- The title must differ from these titles already on the site: ${b.avoidTitles.slice(0, 40).join(" | ")}`);
+  if (b.feedback.length) lines.push("", "Your previous attempt failed these checks. Fix every one:", ...b.feedback.map((f) => `- ${f}`));
+  return lines.join("\n");
+}
+
 const facts = (pairs: [string, string | null | undefined][]) =>
   pairs.filter(([, v]) => v?.trim()).map(([k, v]) => `${k}: ${v!.trim().slice(0, 3000)}`).join("\n");
 
-export function writeProductCopy(details: { name: string; category?: string | null; price?: string | null; colors?: string | null; sizes?: string | null; material?: string | null; notes?: string | null }) {
+export function writeProductCopy(brief: SeoBrief, details: { name: string; category?: string | null; price?: string | null; colors?: string | null; sizes?: string | null; material?: string | null; notes?: string | null }) {
   return ask(
     ProductCopy,
     `Write the store copy for this product.\n\n${facts([
@@ -119,11 +140,15 @@ export function writeProductCopy(details: { name: string; category?: string | nu
       ["Sizes", details.sizes],
       ["Material", details.material],
       ["Details from the admin", details.notes],
-    ])}`,
+    ])}
+
+The product page URL is ${brief.path}
+
+${seoRules(brief)}`,
   );
 }
 
-export function writeSeoCopy(page: { kind: string; label: string; path: string; currentTitle: string; currentDescription: string; context?: string | null }) {
+export function writeSeoCopy(brief: SeoBrief, page: { kind: string; label: string; path: string; currentTitle: string; currentDescription: string; context?: string | null }) {
   return ask(
     SeoCopy,
     `Suggest a search title and description for this page of the store.\n\n${facts([
@@ -133,6 +158,8 @@ export function writeSeoCopy(page: { kind: string; label: string; path: string; 
       ["Current title", page.currentTitle],
       ["Current description", page.currentDescription],
       ["Page content", page.context],
-    ])}`,
+    ])}
+
+${seoRules(brief)}`,
   );
 }

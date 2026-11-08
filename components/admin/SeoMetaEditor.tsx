@@ -1,8 +1,10 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Circle, Code2, Globe, Image as ImageIcon, Link2, Search, Share2, Sparkles, Target } from "lucide-react";
+import { AlertTriangle, Code2, Globe, Image as ImageIcon, Link2, Search, Share2, Sparkles, Target } from "lucide-react";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { seoChecks } from "@/lib/seo-checks";
 import { SubmitButton } from "./client";
+import SeoChecksCard from "./SeoChecksCard";
 import { inputCls, labelCls, primaryBtn } from "./styles";
 
 // Editor for one URL's SEO (Admin → SEO → edit). Empty fields fall back to the defaults shown as
@@ -33,10 +35,8 @@ type Props = {
   descriptionRange: [number, number];
   action: (fd: FormData) => void;
   /** Drafts a title, description and focus keyword with AI; absent when AI isn't set up. */
-  suggest?: () => Promise<{ ok: true; data: { title: string; description: string; focus_keyword: string } } | { ok: false; message: string }>;
+  suggest?: () => Promise<{ ok: true; data: { title: string; description: string; focus_keyword: string; left: string[] } } | { ok: false; message: string }>;
 };
-
-type Check = { ok: boolean | null; text: string };
 
 function Counter({ value, range }: { value: number; range: [number, number] }) {
   const [min, max] = range;
@@ -83,14 +83,13 @@ export default function SeoMetaEditor(p: Props) {
       const result = await p.suggest();
       if (!result.ok) return setAiNote(result.message);
       setV((x) => ({ ...x, title: result.data.title, description: result.data.description, focus_keyword: result.data.focus_keyword }));
-      setAiNote("Suggestion filled in. Check it, then save.");
+      setAiNote(result.data.left.length ? `Filled in. Still to fix: ${result.data.left.join(" ")}` : "Filled in, every check passes. Read it, then save.");
     });
 
   const title = v.title.trim() || p.defaults.title;
   const description = v.description.trim() || p.defaults.description;
   const image = v.og_image.trim() || p.defaults.image;
   const canonical = v.canonical_url.trim() || p.defaults.canonical;
-  const kw = v.focus_keyword.trim().toLowerCase();
 
   const schemaError = useMemo(() => {
     if (!v.schema_json.trim()) return null;
@@ -104,22 +103,7 @@ export default function SeoMetaEditor(p: Props) {
   }, [v.schema_json]);
 
   const noindex = v.noindex || !!p.forcedNoindex;
-  const checks: Check[] = [
-    { ok: title.length >= p.titleRange[0] && title.length <= p.titleRange[1], text: `Title is ${p.titleRange[0]}–${p.titleRange[1]} characters (${title.length})` },
-    { ok: description.length >= p.descriptionRange[0] && description.length <= p.descriptionRange[1], text: `Description is ${p.descriptionRange[0]}–${p.descriptionRange[1]} characters (${description.length})` },
-    { ok: !p.otherTitles.includes(title.toLowerCase()), text: "Title is unique across the site" },
-    { ok: !p.otherDescriptions.includes(description.toLowerCase()), text: "Description is unique across the site" },
-    { ok: kw ? title.toLowerCase().includes(kw) : null, text: "Focus keyword appears in the title" },
-    { ok: kw ? description.toLowerCase().includes(kw) : null, text: "Focus keyword appears in the description" },
-    { ok: kw ? p.url.toLowerCase().includes(kw.replace(/[^a-z0-9]+/g, "-")) : null, text: "Focus keyword appears in the URL" },
-    { ok: kw ? title.toLowerCase().indexOf(kw) <= title.length / 2 : null, text: "Focus keyword is near the start of the title" },
-    { ok: !!image, text: "Has a social share image" },
-    { ok: !noindex, text: "Visible to search engines" },
-  ];
-  const passed = checks.filter((c) => c.ok === true).length;
-  const scored = checks.filter((c) => c.ok !== null).length;
-  const score = scored ? Math.round((passed / scored) * 100) : 0;
-  const scoreTone = score >= 80 ? "text-emerald-700 dark:text-emerald-400" : score >= 50 ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400";
+  const { checks, score } = seoChecks({ title, description, focusKeyword: v.focus_keyword, path: p.url, image, noindex, otherTitles: p.otherTitles, otherDescriptions: p.otherDescriptions });
 
   let host = "";
   let crumbs = "";
@@ -241,26 +225,7 @@ export default function SeoMetaEditor(p: Props) {
       </div>
 
       <aside className="space-y-6 xl:sticky xl:top-24 xl:self-start">
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">SEO checks</h3>
-            <span className={`font-display text-2xl font-bold ${scoreTone}`}>{score}</span>
-          </div>
-          <ul className="mt-4 space-y-2.5">
-            {checks.map((c) => (
-              <li key={c.text} className="flex items-start gap-2 text-xs">
-                {c.ok === true ? (
-                  <CheckCircle2 className="mt-px h-4 w-4 flex-shrink-0 text-emerald-700 dark:text-emerald-400" aria-label="Pass" />
-                ) : c.ok === false ? (
-                  <AlertTriangle className="mt-px h-4 w-4 flex-shrink-0 text-amber-700 dark:text-amber-400" aria-label="Needs work" />
-                ) : (
-                  <Circle className="mt-px h-4 w-4 flex-shrink-0 text-muted-foreground" aria-label="Set a focus keyword" />
-                )}
-                <span className={c.ok === null ? "text-muted-foreground" : "text-foreground"}>{c.text}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <SeoChecksCard checks={checks} score={score} />
 
         <section className="rounded-2xl border border-border bg-card p-5">
           <h3 className="mb-3 text-sm font-semibold text-foreground">Google preview</h3>
